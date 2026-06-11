@@ -66,6 +66,13 @@ public class UserSettings {
     @Column(name = "exam_remind_before_days", columnDefinition = "TINYINT")
     private Short examRemindBeforeDays = 2;        // ngày
 
+    // ── Google Sheet cá nhân ──────────────────────────────
+    @Column(name = "google_sheet_url", length = 500)
+    private String googleSheetUrl;         // Link Google Sheets public của user
+
+    @Column(name = "sheet_synced_at")
+    private LocalDateTime sheetSyncedAt;   // Lần cuối sync từ sheet thành công
+
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 

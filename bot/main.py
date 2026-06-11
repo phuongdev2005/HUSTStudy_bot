@@ -9,6 +9,12 @@ from telegram.ext import Application, CommandHandler
 
 from config import BOT_TOKEN
 from handlers.start import start_handler
+from handlers.schedule import (
+    schedule_handler,
+    setsheet_handler,
+    syncsheet_handler,
+    timetable_handler,
+)
 from services.api_client import api
 
 # Cấu hình logging — xem log khi bot chạy
@@ -27,6 +33,9 @@ async def post_init(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start",      "Bắt đầu & đăng ký tài khoản"),
         BotCommand("schedule",   "Xem thời khóa biểu hôm nay"),
+        BotCommand("timetable",  "Xem lịch học cả tuần"),
+        BotCommand("setsheet",   "Liên kết Google Sheet cá nhân"),
+        BotCommand("syncsheet",  "Đồng bộ thời khóa biểu từ Sheet"),
         BotCommand("deadline",   "Xem deadline sắp tới"),
         BotCommand("exam",       "Xem lịch thi"),
         BotCommand("addexpense", "Ghi chi tiêu"),
@@ -55,9 +64,13 @@ def main():
         .build()
     )
 
-    # ── Đăng ký handlers ──────────────────────────────────────
-    app.add_handler(CommandHandler("start", start_handler))
-    # Thêm handlers khác ở đây khi phát triển thêm
+    # ── Đăng ký handlers ──────────────────────────────────────────
+    app.add_handler(CommandHandler("start",      start_handler))
+    # ── Schedule / Google Sheet ────────────────────────────────
+    app.add_handler(CommandHandler("schedule",   schedule_handler))
+    app.add_handler(CommandHandler("timetable",  timetable_handler))
+    app.add_handler(CommandHandler("setsheet",   setsheet_handler))
+    app.add_handler(CommandHandler("syncsheet",  syncsheet_handler))
 
     # ── Chạy bot (polling) ────────────────────────────────────
     logger.info("Bot đang chạy... Nhấn Ctrl+C để dừng.")

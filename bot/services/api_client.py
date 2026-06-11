@@ -51,6 +51,52 @@ class ApiClient:
         response.raise_for_status()
         return response.json()
 
+    # ── Schedule / Google Sheet API ───────────────────────────
+
+    async def set_sheet(self, telegram_id: int, sheet_url: str) -> dict:
+        """
+        Lưu link Google Sheet của user.
+        POST /api/schedule/{telegramId}/setsheet
+        """
+        response = await self.client.post(
+            f"/schedule/{telegram_id}/setsheet",
+            json={"sheetUrl": sheet_url},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def sync_sheet(self, telegram_id: int) -> dict:
+        """
+        Trigger sync dữ liệu từ Google Sheet vào DB.
+        POST /api/schedule/{telegramId}/sync
+        Returns: { success, syncedCount, errors, message }
+        """
+        response = await self.client.post(
+            f"/schedule/{telegram_id}/sync",
+            timeout=60.0,   # Sync có thể lâu hơn bình thường
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def get_today_schedule(self, telegram_id: int) -> list[dict]:
+        """
+        Lấy lịch học hôm nay từ DB.
+        GET /api/schedule/{telegramId}/today
+        Returns: list of { subjectName, subjectCode, dayOfWeek, startTime, endTime, room, teacher }
+        """
+        response = await self.client.get(f"/schedule/{telegram_id}/today")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_week_schedule(self, telegram_id: int) -> list[dict]:
+        """
+        Lấy toàn bộ lịch học trong tuần từ DB.
+        GET /api/schedule/{telegramId}/week
+        """
+        response = await self.client.get(f"/schedule/{telegram_id}/week")
+        response.raise_for_status()
+        return response.json()
+
     async def close(self):
         """Đóng HTTP client khi shutdown."""
         await self.client.aclose()
