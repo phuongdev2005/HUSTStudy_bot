@@ -43,10 +43,10 @@ public class SheetsConfig {
 
     /**
      * Tạo Sheets API client được authenticate bằng Service Account.
-     * Bean này được inject vào SheetsService.
+     * Bean này được inject vào SheetsService dưới tên "sheetsClient".
      */
-    @Bean
-    public Sheets sheetsService() throws IOException, GeneralSecurityException {
+    @Bean(name = "sheetsClient")
+    public Sheets sheetsClient() throws IOException, GeneralSecurityException {
         try {
             InputStream credStream = resourceLoader
                     .getResource(credentialsPath)

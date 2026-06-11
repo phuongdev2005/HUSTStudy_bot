@@ -12,8 +12,9 @@ import com.studybot.user.User;
 import com.studybot.user.UserRepository;
 import com.studybot.user.UserSettings;
 import com.studybot.user.UserSettingsRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,15 +43,30 @@ import java.util.regex.Pattern;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class SheetsService {
 
-    private final Sheets sheetsClient;          // Có thể null nếu chưa có credentials
+    @Qualifier("sheetsClient")
+    @Autowired(required = false)       // null nếu chưa có credentials
+    private Sheets sheetsClient;
+
     private final UserRepository userRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final SubjectRepository subjectRepository;
     private final ClassScheduleRepository classScheduleRepository;
     private final DailyActivityRepository dailyActivityRepository;
+
+    @Autowired
+    public SheetsService(UserRepository userRepository,
+                         UserSettingsRepository userSettingsRepository,
+                         SubjectRepository subjectRepository,
+                         ClassScheduleRepository classScheduleRepository,
+                         DailyActivityRepository dailyActivityRepository) {
+        this.userRepository            = userRepository;
+        this.userSettingsRepository    = userSettingsRepository;
+        this.subjectRepository         = subjectRepository;
+        this.classScheduleRepository   = classScheduleRepository;
+        this.dailyActivityRepository   = dailyActivityRepository;
+    }
 
     // Regex trích spreadsheetId từ URL Google Sheets
     private static final Pattern SHEET_ID_PATTERN =
