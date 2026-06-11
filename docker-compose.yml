@@ -1,0 +1,73 @@
+services:
+  # ─────────────────────────────────────────
+  #  MySQL Database
+  # ─────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: huststudy_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+07:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
+             "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  #  Spring Boot Backend
+  #  (Flyway tự chạy migration khi khởi động)
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: huststudy_backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql   # override để dùng tên service thay vì localhost
+    ports:
+      - "${SERVER_PORT:-8081}:8081"
+    profiles:
+      - full   # Chỉ chạy khi: docker compose --profile full up
+
+  # ─────────────────────────────────────────
+  #  phpMyAdmin – GUI quản lý DB (dev only)
+  # ─────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: huststudy_phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASSWORD}
+      UPLOAD_LIMIT: 50M
+    ports:
+      - "8888:80"
+    profiles:
+      - dev   # Chỉ chạy khi: docker compose --profile dev up
+
+volumes:
+  mysql_data:
+    name: huststudy_mysql_data

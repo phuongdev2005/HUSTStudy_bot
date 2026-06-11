@@ -1,0 +1,37 @@
+@startuml sequence_start
+title Sequence Diagram — Đăng ký người dùng (/start)
+
+skinparam SequenceArrowThickness 2
+skinparam SequenceBoxBackgroundColor LightBlue
+skinparam ParticipantBackgroundColor WhiteSmoke
+skinparam ParticipantBorderColor DarkBlue
+skinparam NoteBackgroundColor LightYellow
+
+actor       "Người dùng"    as User
+participant "Telegram API"  as TG
+participant "Python Bot"    as Bot
+participant "Java API\n(:8081)" as API
+database    "MySQL"         as DB
+
+User -> TG  : Gõ /start
+TG   -> Bot : Update { message: "/start" }
+
+Bot  -> Bot : Lấy user.id, user.full_name
+note right : từ update.effective_user
+
+Bot  -> API : POST /users/register\n{ telegramId, username, fullName }
+
+API  -> DB  : SELECT * FROM users\nWHERE telegram_id = ?
+DB  --> API : null (chưa có)
+
+API  -> DB  : INSERT INTO users (...)\nINSERT INTO user_settings (...)
+note right : UserSettings mặc định:\nnotify_* = true\nclassRemindBefore = 30 phút
+
+DB  --> API : user_id = 1
+
+API --> Bot : 201 Created\n{ id:1, telegramId:..., fullName:... }
+
+Bot  -> TG  : sendMessage(chat_id,\n"👋 Xin chào Phương!\n🤖 Mình là HUSTStudy Bot...")
+TG   -> User : Hiển thị tin nhắn chào + danh sách lệnh
+
+@enduml

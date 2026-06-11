@@ -1,0 +1,104 @@
+@startuml use_case_diagram
+title HUSTStudy Bot — Use Case Diagram
+
+skinparam ActorStyle awesome
+skinparam usecase {
+    BackgroundColor LightBlue
+    BorderColor DarkBlue
+    ArrowColor DarkBlue
+}
+skinparam rectangle {
+    BackgroundColor WhiteSmoke
+    BorderColor DarkGray
+}
+
+left to right direction
+
+actor "Người dùng\n(Sinh viên)" as User
+actor "Scheduler\n(Hệ thống)" as Scheduler
+actor "Google Sheets API" as GSheets
+
+rectangle "HUSTStudy Bot" {
+
+    rectangle "Quản lý tài khoản" {
+        usecase "Đăng ký tài khoản\n(/start)" as UC01
+        usecase "Xem hướng dẫn\n(/help)" as UC02
+    }
+
+    rectangle "Quản lý lịch học" {
+        usecase "Thêm môn học\n(/addsubject)" as UC03
+        usecase "Xem TKB hôm nay\n(/schedule)" as UC04
+        usecase "Xem TKB theo tuần\n(/timetable)" as UC05
+        usecase "Xóa môn học" as UC06
+    }
+
+    rectangle "Deadline & Lịch thi" {
+        usecase "Thêm deadline\n(/adddeadline)" as UC07
+        usecase "Xem deadline sắp tới\n(/deadline)" as UC08
+        usecase "Đánh dấu hoàn thành" as UC09
+        usecase "Thêm lịch thi\n(/addexam)" as UC10
+        usecase "Xem lịch thi\n(/exam)" as UC11
+    }
+
+    rectangle "Quản lý chi tiêu" {
+        usecase "Ghi chi tiêu\n(/addexpense)" as UC12
+        usecase "Ghi thu nhập\n(/addincome)" as UC13
+        usecase "Xem báo cáo\n(/report)" as UC14
+        usecase "Đặt ngân sách\n(/budget)" as UC15
+    }
+
+    rectangle "Ôn tập từ vựng & Ngữ pháp" {
+        usecase "Thêm từ vựng\n(/addword)" as UC16
+        usecase "Bắt đầu quiz\n(/quiz)" as UC17
+        usecase "Xem kết quả ôn tập" as UC18
+    }
+
+    rectangle "Xuất dữ liệu" {
+        usecase "Xuất TKB ra Sheets\n(/export schedule)" as UC19
+        usecase "Xuất chi tiêu ra Sheets\n(/export expense)" as UC20
+        usecase "Xuất toàn bộ\n(/export all)" as UC21
+    }
+
+    rectangle "Thông báo tự động" {
+        usecase "Nhắc giờ học" as UC22
+        usecase "Nhắc deadline" as UC23
+        usecase "Nhắc lịch thi" as UC24
+        usecase "Gửi tổng hợp ngày" as UC25
+    }
+}
+
+' Người dùng → Use Cases
+User --> UC01
+User --> UC02
+User --> UC03
+User --> UC04
+User --> UC05
+User --> UC06
+User --> UC07
+User --> UC08
+User --> UC09
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+User --> UC18
+User --> UC19
+User --> UC20
+User --> UC21
+
+' Scheduler → thông báo
+Scheduler --> UC22
+Scheduler --> UC23
+Scheduler --> UC24
+Scheduler --> UC25
+
+' Xuất → Google Sheets
+UC19 --> GSheets
+UC20 --> GSheets
+UC21 --> GSheets
+
+@enduml

@@ -1,0 +1,197 @@
+@startuml erd
+title ERD — HUSTStudy Bot (MySQL Database)
+
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam ClassBackgroundColor WhiteSmoke
+skinparam ClassBorderColor DarkGray
+
+' ══════════════════════════
+'  MODULE: USER
+' ══════════════════════════
+
+entity "users" as users #DDEEFF {
+    * id : BIGINT <<PK, AUTO_INCREMENT>>
+    --
+    * telegram_id : BIGINT <<UNIQUE>>
+    username : VARCHAR(100)
+    * full_name : VARCHAR(255)
+    language_code : VARCHAR(10) = 'vi'
+    timezone : VARCHAR(50) = 'Asia/Ho_Chi_Minh'
+    * is_active : BOOLEAN = true
+    * created_at : DATETIME
+    * updated_at : DATETIME
+}
+
+entity "user_settings" as user_settings #DDEEFF {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK, UNIQUE>>
+    notify_class_remind : BOOLEAN = true
+    notify_deadline : BOOLEAN = true
+    notify_exam : BOOLEAN = true
+    notify_budget_warn : BOOLEAN = true
+    notify_daily_summary : BOOLEAN = true
+    daily_summary_time : TIME = '07:00'
+    class_remind_before : SMALLINT = 30
+    deadline_remind_before : SMALLINT = 1440
+    exam_remind_before_days : TINYINT = 2
+    * updated_at : DATETIME
+}
+
+' ══════════════════════════
+'  MODULE: SCHEDULE
+' ══════════════════════════
+
+entity "subjects" as subjects #DDFFD8 {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * name : VARCHAR(200)
+    code : VARCHAR(20)
+    teacher : VARCHAR(200)
+    credits : INT
+    * is_active : BOOLEAN = true
+}
+
+entity "class_sessions" as class_sessions #DDFFD8 {
+    * id : BIGINT <<PK>>
+    --
+    * subject_id : BIGINT <<FK>>
+    * day_of_week : TINYINT
+    * start_time : VARCHAR(5)
+    * end_time : VARCHAR(5)
+    room : VARCHAR(50)
+    week_type : VARCHAR(10) = 'ALL'
+}
+
+note right of class_sessions
+    day_of_week: 2=Thứ2...8=CN
+    week_type: ALL|EVEN|ODD
+end note
+
+' ══════════════════════════
+'  MODULE: DEADLINE
+' ══════════════════════════
+
+entity "deadlines" as deadlines #FFEECC {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * title : VARCHAR(300)
+    subject : VARCHAR(200)
+    * due_date : DATE
+    note : TEXT
+    * is_done : BOOLEAN = false
+    * created_at : DATETIME
+}
+
+' ══════════════════════════
+'  MODULE: EXAM
+' ══════════════════════════
+
+entity "exams" as exams #FFE8CC {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * subject : VARCHAR(200)
+    * exam_date : DATE
+    * start_time : TIME
+    duration_minutes : INT
+    room : VARCHAR(50)
+    exam_type : VARCHAR(50)
+    note : TEXT
+    * created_at : DATETIME
+}
+
+' ══════════════════════════
+'  MODULE: EXPENSE
+' ══════════════════════════
+
+entity "categories" as categories #FFD6D6 {
+    * id : BIGINT <<PK>>
+    --
+    * name : VARCHAR(100)
+    icon : VARCHAR(10)
+    description : VARCHAR(300)
+    * is_default : BOOLEAN = false
+}
+
+entity "transactions" as transactions #FFD6D6 {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    category_id : BIGINT <<FK, nullable>>
+    * type : ENUM('EXPENSE','INCOME')
+    * amount : DECIMAL(15,0)
+    note : VARCHAR(500)
+    * transacted_at : DATETIME
+    * created_at : DATETIME
+}
+
+entity "budgets" as budgets #FFD6D6 {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * category_id : BIGINT <<FK>>
+    * limit_amount : DECIMAL(15,0)
+    * month : TINYINT
+    * year : SMALLINT
+}
+
+note bottom of budgets
+    UNIQUE(user_id, category_id, month, year)
+end note
+
+' ══════════════════════════
+'  MODULE: VOCABULARY
+' ══════════════════════════
+
+entity "words" as words #EDE0FF {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * word : VARCHAR(200)
+    * meaning : VARCHAR(500)
+    example : TEXT
+    pronunciation : VARCHAR(200)
+    * level : INT = 0
+    * next_review_at : DATETIME
+    * created_at : DATETIME
+}
+
+note right of words
+    level: Spaced Repetition
+    0=mới, tăng dần khi đúng
+end note
+
+entity "quiz_results" as quiz_results #EDE0FF {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * total_questions : INT
+    * correct_answers : INT
+    * wrong_answers : INT
+    * score_percent : INT
+    * played_at : DATETIME
+}
+
+' ══════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════
+
+users           ||--||  user_settings  : "1 - 1"
+users           ||--o{  subjects       : "1 - N"
+users           ||--o{  deadlines      : "1 - N"
+users           ||--o{  exams          : "1 - N"
+users           ||--o{  transactions   : "1 - N"
+users           ||--o{  budgets        : "1 - N"
+users           ||--o{  words          : "1 - N"
+users           ||--o{  quiz_results   : "1 - N"
+
+subjects        ||--o{  class_sessions : "1 - N"
+
+categories      ||--o{  transactions   : "1 - N"
+categories      ||--o{  budgets        : "1 - N"
+
+@enduml

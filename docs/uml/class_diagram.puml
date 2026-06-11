@@ -1,0 +1,280 @@
+@startuml class_diagram
+title Class Diagram — HUSTStudy Bot (Java Backend)
+
+skinparam ClassBackgroundColor WhiteSmoke
+skinparam ClassBorderColor DarkBlue
+skinparam ClassHeaderBackgroundColor #4A90D9
+skinparam ClassFontColor White
+skinparam ArrowColor DarkBlue
+skinparam NoteBackgroundColor LightYellow
+
+' ══════════════════════════
+'  MODULE: USER
+' ══════════════════════════
+
+package "user" #DDEEFF {
+
+    class User {
+        - id : Long
+        - telegramId : Long
+        - username : String
+        - fullName : String
+        - languageCode : String
+        - timezone : String
+        - isActive : Boolean
+        - createdAt : LocalDateTime
+        - updatedAt : LocalDateTime
+        - settings : UserSettings
+        # onCreate() : void
+        # onUpdate() : void
+    }
+
+    class UserSettings {
+        - id : Long
+        - user : User
+        - notifyClassRemind : Boolean
+        - notifyDeadline : Boolean
+        - notifyExam : Boolean
+        - notifyBudgetWarn : Boolean
+        - notifyDailySummary : Boolean
+        - dailySummaryTime : LocalTime
+        - classRemindBefore : Short
+        - deadlineRemindBefore : Short
+        - examRemindBeforeDays : Short
+        - updatedAt : LocalDateTime
+        # onUpdate() : void
+    }
+
+    class UserRequest {
+        - telegramId : Long
+        - username : String
+        - fullName : String
+        - languageCode : String
+        - timezone : String
+    }
+
+    class UserResponse {
+        - id : Long
+        - telegramId : Long
+        - username : String
+        - fullName : String
+        - isActive : Boolean
+        - createdAt : LocalDateTime
+        + {static} from(user: User) : UserResponse
+    }
+
+    interface UserRepository {
+        + findByTelegramId(Long) : Optional<User>
+        + existsByTelegramId(Long) : boolean
+    }
+
+    class UserService {
+        - userRepository : UserRepository
+        + registerOrUpdate(UserRequest) : UserResponse
+        + getByTelegramId(Long) : UserResponse
+        + existsByTelegramId(Long) : boolean
+        - createNewUser(UserRequest) : User
+    }
+
+    class UserController {
+        - userService : UserService
+        + register(UserRequest) : ResponseEntity<UserResponse>
+        + getByTelegramId(Long) : ResponseEntity<UserResponse>
+        + exists(Long) : ResponseEntity<Boolean>
+    }
+}
+
+' ══════════════════════════
+'  MODULE: SCHEDULE
+' ══════════════════════════
+
+package "schedule" #DDFFD8 {
+
+    class Subject {
+        - id : Long
+        - user : User
+        - name : String
+        - code : String
+        - teacher : String
+        - credits : Integer
+        - isActive : Boolean
+    }
+
+    class ClassSession {
+        - id : Long
+        - subject : Subject
+        - dayOfWeek : Integer
+        - startTime : String
+        - endTime : String
+        - room : String
+        - weekType : String
+    }
+
+    note right of ClassSession
+        weekType:
+        ALL = mỗi tuần
+        EVEN = tuần chẵn
+        ODD = tuần lẻ
+    end note
+}
+
+' ══════════════════════════
+'  MODULE: DEADLINE
+' ══════════════════════════
+
+package "deadline" #FFEECC {
+
+    class Deadline {
+        - id : Long
+        - user : User
+        - title : String
+        - subject : String
+        - dueDate : LocalDate
+        - note : String
+        - isDone : Boolean
+        - createdAt : LocalDateTime
+        # onCreate() : void
+    }
+}
+
+' ══════════════════════════
+'  MODULE: EXAM
+' ══════════════════════════
+
+package "exam" #FFE0E0 {
+
+    class Exam {
+        - id : Long
+        - user : User
+        - subject : String
+        - examDate : LocalDate
+        - startTime : LocalTime
+        - durationMinutes : Integer
+        - room : String
+        - examType : String
+        - note : String
+        - createdAt : LocalDateTime
+        # onCreate() : void
+    }
+}
+
+' ══════════════════════════
+'  MODULE: EXPENSE
+' ══════════════════════════
+
+package "expense" #FFD6D6 {
+
+    enum TransactionType {
+        EXPENSE
+        INCOME
+    }
+
+    class Transaction {
+        - id : Long
+        - user : User
+        - category : Category
+        - type : TransactionType
+        - amount : BigDecimal
+        - note : String
+        - transactedAt : LocalDateTime
+        - createdAt : LocalDateTime
+        # onCreate() : void
+    }
+
+    class Category {
+        - id : Long
+        - name : String
+        - icon : String
+        - description : String
+        - isDefault : Boolean
+    }
+
+    class Budget {
+        - id : Long
+        - user : User
+        - category : Category
+        - limitAmount : BigDecimal
+        - month : Integer
+        - year : Integer
+    }
+}
+
+' ══════════════════════════
+'  MODULE: VOCABULARY
+' ══════════════════════════
+
+package "vocabulary" #EDE0FF {
+
+    class Word {
+        - id : Long
+        - user : User
+        - word : String
+        - meaning : String
+        - example : String
+        - pronunciation : String
+        - level : Integer
+        - nextReviewAt : LocalDateTime
+        - createdAt : LocalDateTime
+        # onCreate() : void
+    }
+
+    class QuizResult {
+        - id : Long
+        - user : User
+        - totalQuestions : Integer
+        - correctAnswers : Integer
+        - wrongAnswers : Integer
+        - scorePercent : Integer
+        - playedAt : LocalDateTime
+        # onCreate() : void
+    }
+}
+
+' ══════════════════════════
+'  MODULE: SHEETS
+' ══════════════════════════
+
+package "sheets" #F5F5F5 {
+
+    class SheetsService {
+        + exportSchedule(Long, String) : String
+        + exportDeadlineAndExam(Long, String) : String
+        + exportExpenseReport(Long, String, int, int) : String
+        + exportAll(Long, String) : String
+    }
+}
+
+' ══════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════
+
+' User ↔ UserSettings (1-1 composition)
+User "1" *-- "1" UserSettings : has >
+
+' User → nhiều (1-N aggregation)
+User "1" o-- "N" Subject      : owns >
+User "1" o-- "N" Deadline     : owns >
+User "1" o-- "N" Exam         : owns >
+User "1" o-- "N" Transaction  : makes >
+User "1" o-- "N" Budget       : sets >
+User "1" o-- "N" Word         : learns >
+User "1" o-- "N" QuizResult   : has >
+
+' Subject → ClassSession (1-N composition)
+Subject "1" *-- "N" ClassSession : has >
+
+' Category → Transaction / Budget
+Category "1" o-- "N" Transaction : classifies >
+Category "1" o-- "N" Budget      : limits >
+
+' Transaction → enum
+Transaction --> TransactionType : uses
+
+' Layer dependencies
+UserController ..> UserService    : <<uses>>
+UserService    ..> UserRepository : <<uses>>
+UserService    ..> UserRequest    : <<receives>>
+UserService    ..> UserResponse   : <<returns>>
+UserResponse   ..> User           : <<maps from>>
+
+@enduml

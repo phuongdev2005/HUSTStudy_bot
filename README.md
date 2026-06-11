@@ -151,98 +151,57 @@ Hệ thống có thể triển khai trên:
 
 ## 4. Tính năng hệ thống
 
-### 4.1. Quản lý thời khóa biểu
+### 4.1. Quản lý thời khóa biểu hoạt động hằng ngày.
 
-Người dùng có thể:
++ thêm lịch học trên trường. thêm lịch làm việc cá nhân + từ google sheet.
 
-- Thêm môn học.
 - Chỉnh sửa lịch học.
-- Xóa lịch học.
 - Xem lịch học theo ngày hoặc theo tuần.
 
-**Ví dụ command:**
+**các command:**
 
 ```
-/addsubject
+/connectsheet
+/sync
+
 /schedule
 /timetable
+
+/addsubject
+/editsubject
+/deletesubject
+
+/adddeadline
+/deadlines
+/deletedeadline
+
+/notification
+/remind
+
+/stats
+/help
 ```
 
-### 4.2. Nhắc lịch học và bài tập
+4.2 Quản lý lịch thi và deadline
 
-Bot tự động gửi thông báo:
+- Import lịch thi từ file sheet của trường -> so khớp với thời khóa biểu -> tìm đúng lịch thi.
+- Thêm lịch thi thủ công
+- Đếm ngược đến ngày thi
+- Lịch thi tuần này
+- Quản lý deadline bài tập
+- Đánh dấu đã hoàn thành
+- Mức độ ưu tiên
 
-- Trước giờ học.
-- Trước hạn nộp bài tập.
-- Khi deadline sắp đến.
-
-**Ví dụ:**
-
-```
-18:30 hôm nay có môn Java Programming.
-Deadline báo cáo Linux còn 1 ngày.
-```
-
-### 4.3. Thông báo lịch thi sắp đến
-
-Bot hỗ trợ:
-
-- Lưu lịch thi.
-- Nhắc trước ngày thi.
-- Hiển thị môn thi, phòng thi và thời gian thi.
-
-**Ví dụ:**
-
-```
-2 ngày nữa thi môn Cấu trúc dữ liệu.
-Phòng thi: A305.
-Thời gian: 7:00 sáng.
-```
-
-### 4.4. Thông báo sự kiện học tập trong ngày
+### 4.3. Thông báo hằng ngày( sự kiện ĐRL, sự kiện sắp đến, quiz từ vựng ngẫu nhiên)
 
 Mỗi ngày, bot có thể gửi bản tổng hợp gồm:
 
-- Lịch học hôm nay.
+- Đang giờ này đang là giờ gì
 - Deadline bài tập.
 - Lịch thi gần nhất.
 - Nhiệm vụ học tập cần hoàn thành.
 
-**Ví dụ:**
-
-```
-Hôm nay:
-- Java Programming: 7:00
-- Làm bài tập Linux
-- Ôn 20 từ vựng TOEIC
-```
-
-### 4.5. Xuất dữ liệu ra Google Sheets
-
-Bot có thể tự động xuất dữ liệu ra Google Sheets để người dùng xem và lưu trữ:
-
-- Xuất toàn bộ thời khóa biểu ra sheet **"Lịch học"**.
-- Xuất danh sách bài tập & lịch thi ra sheet **"Deadline & Thi"**.
-- Xuất báo cáo chi tiêu tháng ra sheet **"Chi tiêu"** kèm bảng tổng hợp.
-- Tự động cập nhật khi người dùng thêm/sửa/xóa dữ liệu.
-
-**Ví dụ command:**
-
-```
-/export schedule   → Xuất thời khóa biểu ra Sheets
-/export expense    → Xuất báo cáo chi tiêu ra Sheets
-/export all        → Xuất toàn bộ dữ liệu
-```
-
-**Ví dụ phản hồi:**
-
-```
-✅ Đã xuất dữ liệu ra Google Sheets!
-🔗 https://docs.google.com/spreadsheets/d/...
-📊 Sheet "Chi tiêu T6/2025" đã được cập nhật.
-```
-
-### 4.6. Chế độ hỏi đáp từ vựng, ngữ pháp
+### 4.4. Chế độ hỏi đáp từ vựng , ngữ pháp
 
 Người dùng có thể thêm từ vựng theo dạng:
 
@@ -272,77 +231,11 @@ Tính năng này có thể mở rộng thành:
 - Spaced repetition.
 - Chatbot hỗ trợ học tiếng Anh.
 
-### 4.7. Quản lý chi tiêu cá nhân
+### 4.5. Quản lý chi tiêu cá nhân
 
-Người dùng có thể ghi chép thu chi nhanh chóng ngay trong Telegram.
+- đưa vào ảnh  lấy note chji tiêu
 
-**Ghi chép giao dịch:**
 
-```
-/addexpense 50000 ăn sáng
-/addincome 500000 tiền học bổng
-```
-
-Hoặc nhập theo hội thoại:
-
-```
-Bot: Số tiền?
-User: 35000
-Bot: Danh mục? (Ăn uống / Di chuyển / Học phí / Giải trí / Khác)
-User: Ăn uống
-Bot: Ghi chú? (bỏ qua hoặc nhập)
-User: cơm trưa
-Bot: ✅ Đã ghi: -35,000đ | Ăn uống | cơm trưa
-```
-
-**Xem báo cáo:**
-
-```
-/report today     → Tổng chi hôm nay
-/report week      → Tổng chi 7 ngày qua
-/report month     → Báo cáo tháng này theo danh mục
-/budget           → Xem ngân sách và mức đã dùng
-```
-
-**Ví dụ báo cáo tháng:**
-
-```
-📊 Báo cáo tháng 6/2025
-─────────────────────────
-🍜 Ăn uống:      850,000đ  ████████░░  85%
-🚌 Di chuyển:    120,000đ  ████░░░░░░  40%
-📚 Học phí:      500,000đ  ██████████ 100%
-🎮 Giải trí:       75,000đ  ██░░░░░░░░  25%
-─────────────────────────
-💸 Tổng chi:   1,545,000đ
-💰 Thu nhập:   3,000,000đ
-✅ Còn lại:    1,455,000đ
-```
-
-**Đặt ngân sách và cảnh báo:**
-
-- Đặt hạn mức chi tiêu theo danh mục mỗi tháng.
-- Bot tự động cảnh báo khi đạt 80% và 100% ngân sách.
-- Tổng hợp chi tiêu cuối ngày / tuần / tháng.
-
-**Ví dụ cảnh báo:**
-
-```
-⚠️ Cảnh báo: Danh mục "Ăn uống" đã dùng 85% ngân sách tháng!
-Còn lại: 150,000đ / 1,000,000đ
-```
-
-**Danh mục chi tiêu mặc định:**
-
-| Danh mục | Icon | Gợi ý dùng |
-|---|---|---|
-| Ăn uống | 🍜 | Cơm, cafe, trà sữa |
-| Di chuyển | 🚌 | Xe buýt, grab, xăng |
-| Học phí & Sách | 📚 | Học phí, giáo trình |
-| Giải trí | 🎮 | Game, phim, du lịch |
-| Mua sắm | 🛍️ | Quần áo, đồ dùng |
-| Y tế | 💊 | Thuốc, khám bệnh |
-| Khác | 📦 | Các khoản không phân loại |
 ---
 
 ## 5. Kiến trúc hệ thống
@@ -381,6 +274,7 @@ Python Bot Service     Java Backend API
 Các tính năng có thể phát triển thêm:
 
 **Học tập:**
+
 - 🤖 AI hỗ trợ học tập.
 - 💬 Chatbot giải bài tập.
 - 📅 Gợi ý lịch học tối ưu.
@@ -391,6 +285,7 @@ Các tính năng có thể phát triển thêm:
 - 🔄 Chế độ ôn tập theo spaced repetition.
 
 **Chi tiêu:**
+
 - 📈 Biểu đồ chi tiêu trực quan (xuất ảnh PNG).
 - 🏦 Theo dõi nhiều ví / tài khoản ngân hàng.
 - 🔁 Giao dịch định kỳ tự động (học phí, tiền nhà).
