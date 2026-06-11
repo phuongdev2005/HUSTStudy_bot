@@ -509,5 +509,251 @@ public class SheetsService {
         // Nếu user gõ đúng tiếng Việt
         return raw.trim().length() > 30 ? raw.trim().substring(0, 30) : raw.trim();
     }
-}
 
+    // ═══════════════════════════════════════════════════════════
+    //  GRID FORMAT PARSER – Lưới thời khóa biểu
+    //  Hàng 1 = Header: "Giờ bắt đầu - Giờ kết thúc | Thứ 2 | Thứ 3 | ..."
+    //  Hàng 2+ = Data:  "07:30 - 09:30 | Giải tích 1 | Vật lý | ..."
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Kiểm tra xem sheet có phải format lưới không.
+     * Nhận biết bằng cột đầu tiên của header chứa " - " (dạng "HH:MM - HH:MM").
+     */
+    private boolean isGridFormat(List<List<Object>> allRows) {
+        if (allRows == null || allRows.isEmpty()) return false;
+        List<Object> header = allRows.get(0);
+        if (header.isEmpty()) return false;
+        String first = header.get(0).toString().toLowerCase().trim();
+        // Grid format: cột A header chứa "giờ" hoặc "-" hoặc "bắt đầu"
+        return first.contains("giờ") || first.contains("bắt đầu") || first.contains(" - ");
+    }
+
+    /**
+     * Đọc header của sheet grid để lấy mapping: index cột → dayOfWeek.
+     *
+     * Header ví dụ: ["Giờ bắt đầu - Giờ kết thúc", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
+     * Kết quả: { 1 → 1(T2), 2 → 2(T3), 3 → 3(T4), 4 → 4(T5), 5 → 5(T6), 6 → 6(T7), 7 → 7(CN) }
+     */
+    private java.util.Map<Integer, Integer> parseGridHeader(List<Object> header) {
+        java.util.Map<Integer, Integer> colToDow = new java.util.LinkedHashMap<>();
+        for (int c = 1; c < header.size(); c++) {
+            String cell = header.get(c).toString().toLowerCase().trim()
+                    .replace("thứ", "").replace("thu", "")
+                    .replace(" ", "").replace("_", "");
+            Integer dow = switch (cell) {
+                case "2", "hai", "t2", "monday",    "mon"      -> 1;
+                case "3", "ba",  "t3", "tuesday",   "tue"      -> 2;
+                case "4", "tu",  "t4", "wednesday", "wed"      -> 3;
+                case "5", "nam", "t5", "thursday"              -> 4;
+                case "6", "sau", "t6", "friday",    "fri"      -> 5;
+                case "7", "bay", "t7", "saturday",  "sat"      -> 6;
+                case "8", "cn",       "sunday",     "sun",
+                     "chunhat", "chủnhật"                      -> 7;
+                default -> null;
+            };
+            if (dow != null) colToDow.put(c, dow);
+        }
+        return colToDow;
+    }
+
+    /**
+     * Parse 1 ô thời gian dạng "07:30 - 09:30" → [startTime, endTime].
+     * Hỗ trợ cả dạng "07:30-09:30" và "07:30 – 09:30".
+     */
+    private String[] parseTimeSlot(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        // Normalize dashes
+        String normalized = raw.replace("–", "-").replace("—", "-").trim();
+        String[] parts = normalized.split("-", 2);
+        if (parts.length < 2) return null;
+        String start = parts[0].trim();
+        String end   = parts[1].trim();
+        if (start.isBlank() || end.isBlank()) return null;
+        return new String[]{ start, end };
+    }
+
+    /**
+     * Sync sheet dạng lưới vào daily_activities.
+     * Đọc từ range A1:Z (lấy cả header ở hàng 1).
+     */
+    @Transactional
+    public SyncResult syncGridScheduleFromSheet(Long telegramId) {
+        if (sheetsClient == null) {
+            return SyncResult.error("Google Sheets API chưa được cấu hình trên server.");
+        }
+
+        User user = getUserByTelegramId(telegramId);
+        UserSettings settings = getUserSettings(user);
+        String sheetUrl = settings.getGoogleSheetUrl();
+        if (sheetUrl == null || sheetUrl.isBlank()) {
+            return SyncResult.error("Bạn chưa liên kết Google Sheet!\nDùng: /setsheet <link>");
+        }
+
+        String spreadsheetId = extractSpreadsheetId(sheetUrl);
+        if (spreadsheetId == null) {
+            return SyncResult.error("Link sheet không hợp lệ.");
+        }
+
+        try {
+            // Đọc cả hàng header (A1:Z)
+            ValueRange response = sheetsClient.spreadsheets().values()
+                    .get(spreadsheetId, "A1:Z")
+                    .execute();
+
+            List<List<Object>> rows = response.getValues();
+            if (rows == null || rows.size() < 2) {
+                return SyncResult.error("Sheet cần ít nhất 2 hàng (header + dữ liệu).");
+            }
+
+            // Parse header → mapping cột → thứ
+            List<Object> header = rows.get(0);
+            java.util.Map<Integer, Integer> colToDow = parseGridHeader(header);
+
+            if (colToDow.isEmpty()) {
+                return SyncResult.error(
+                    "Không đọc được tên ngày từ header.\n" +
+                    "Hàng 1 cần có: Thứ 2, Thứ 3, Thứ 4, Thứ 5, Thứ 6 (hoặc T2–CN)");
+            }
+
+            // Xóa lịch cũ
+            dailyActivityRepository.deleteAllByUser(user);
+            dailyActivityRepository.flush();
+
+            List<String> errors = new ArrayList<>();
+            int successCount = 0;
+            int sortOrder = 0;
+
+            // Đọc từ hàng 2 trở đi (bỏ header)
+            for (int r = 1; r < rows.size(); r++) {
+                List<Object> row = rows.get(r);
+                if (row.isEmpty()) continue;
+
+                String timeCell = getString(row, 0);
+                if (timeCell.startsWith("#") || timeCell.isBlank()) continue;
+
+                String[] times = parseTimeSlot(timeCell);
+                if (times == null) {
+                    errors.add("Hàng " + (r + 1) + ": Định dạng giờ không hợp lệ '" + timeCell + "'");
+                    continue;
+                }
+
+                String startTime = times[0];
+                String endTime   = times[1];
+
+                // Duyệt từng cột ngày
+                for (java.util.Map.Entry<Integer, Integer> entry : colToDow.entrySet()) {
+                    int col = entry.getKey();
+                    int dow = entry.getValue();
+
+                    if (col >= row.size()) continue;
+                    String activityText = getString(row, col);
+                    if (activityText.isBlank()) continue;  // Ô trống = không có hoạt động
+
+                    // Parse "Tên hoạt động (Ghi chú)" → tách note trong ngoặc
+                    String activity = activityText;
+                    String note     = null;
+                    int paren = activityText.lastIndexOf('(');
+                    if (paren > 0 && activityText.endsWith(")")) {
+                        activity = activityText.substring(0, paren).trim();
+                        note     = activityText.substring(paren + 1, activityText.length() - 1).trim();
+                    }
+
+                    String category = inferCategory(activity);
+
+                    DailyActivity da = DailyActivity.builder()
+                            .user(user)
+                            .dayOfWeek(dow)
+                            .startTime(startTime)
+                            .endTime(endTime)
+                            .activity(activity)
+                            .category(category)
+                            .note(note)
+                            .sortOrder(sortOrder++)
+                            .build();
+                    dailyActivityRepository.save(da);
+                    successCount++;
+                }
+            }
+
+            settings.setSheetSyncedAt(LocalDateTime.now());
+            userSettingsRepository.save(settings);
+
+            log.info("✅ Sync grid schedule xong user {} – {} slots", telegramId, successCount);
+            return SyncResult.success(successCount, errors);
+
+        } catch (java.io.IOException e) {
+            log.error("Lỗi đọc sheet grid {}: {}", telegramId, e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("403")) {
+                return SyncResult.error("❌ Không có quyền đọc sheet!\nShare → Anyone with link → Viewer");
+            }
+            return SyncResult.error("❌ Lỗi kết nối: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Auto-detect format sheet rồi sync đúng parser.
+     * - Nếu header có "Thứ 2/3/4..." → grid format
+     * - Ngược lại → row format (6 cột cũ)
+     */
+    @Transactional
+    public SyncResult autoSyncSheet(Long telegramId) {
+        if (sheetsClient == null) {
+            return SyncResult.error("Google Sheets API chưa được cấu hình trên server.");
+        }
+
+        User user = getUserByTelegramId(telegramId);
+        UserSettings settings = getUserSettings(user);
+        String sheetUrl = settings.getGoogleSheetUrl();
+        if (sheetUrl == null || sheetUrl.isBlank()) {
+            return SyncResult.error("Bạn chưa liên kết Google Sheet!\nDùng: /setsheet <link>");
+        }
+
+        String spreadsheetId = extractSpreadsheetId(sheetUrl);
+        try {
+            // Đọc hàng đầu để detect format
+            ValueRange probe = sheetsClient.spreadsheets().values()
+                    .get(spreadsheetId, "A1:Z1")
+                    .execute();
+
+            List<List<Object>> headerRows = probe.getValues();
+            boolean isGrid = isGridFormat(headerRows);
+
+            log.info("User {} sheet format detected: {}", telegramId, isGrid ? "GRID" : "ROW");
+
+            if (isGrid) {
+                return syncGridScheduleFromSheet(telegramId);
+            } else {
+                return syncDailyScheduleFromSheet(telegramId);
+            }
+
+        } catch (java.io.IOException e) {
+            return SyncResult.error("❌ Lỗi kết nối Google Sheets: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tự động suy luận danh mục từ tên hoạt động.
+     */
+    private String inferCategory(String activity) {
+        if (activity == null || activity.isBlank()) return "Khác";
+        String s = activity.toLowerCase();
+        if (s.contains("ngủ") || s.contains("nghỉ") || s.contains("nướng"))         return "Nghỉ ngơi";
+        if (s.contains("vệ sinh") || s.contains("dọn") || s.contains("giặt")
+                || s.contains("chuẩn bị") || s.contains("dậy"))                     return "Sinh hoạt";
+        if (s.contains("ăn") || s.contains("brunch") || s.contains("canteen"))       return "Ăn uống";
+        if (s.contains("học") || s.contains("thi") || s.contains("bài")
+                || s.contains("ôn") || s.contains("đồ án") || s.contains("lab")
+                || s.contains("tiếng anh") || s.contains("giải tích")
+                || s.contains("vật lý") || s.contains("triết") || s.contains("lập trình")
+                || s.contains("cơ sở") || s.contains("thư viện"))                   return "Học tập";
+        if (s.contains("thể dục") || s.contains("tập") || s.contains("gym")
+                || s.contains("chạy") || s.contains("bóng") || s.contains("sport")) return "Thể dục";
+        if (s.contains("giải trí") || s.contains("youtube") || s.contains("phim")
+                || s.contains("nhạc") || s.contains("chơi") || s.contains("đọc")
+                || s.contains("gọi điện") || s.contains("mua sắm"))                  return "Giải trí";
+        if (s.contains("di chuyển") || s.contains("xe") || s.contains("đến trường")
+                || s.contains("về nhà") || s.contains("bus"))                        return "Di chuyển";
+        return "Khác";
+    }
+}

@@ -74,13 +74,15 @@ public class ScheduleSyncController {
     }
 
     /**
-     * Trigger sync lịch sinh hoạt toàn ngày từ Google Sheet (format 6 cột).
+     * Trigger sync lịch sinh hoạt — TỰ ĐỘNG nhận dạng format:
+     *   - Grid format (hàng=giờ, cột=ngày): header có "Thứ 2, Thứ 3..."
+     *   - Row format (6 cột): header có "Thứ | Giờ bắt | Giờ kết | ..."
      *
      * POST /api/schedule/{telegramId}/sync-daily
      */
     @PostMapping("/{telegramId}/sync-daily")
     public ResponseEntity<SyncResult> syncDailySheet(@PathVariable Long telegramId) {
-        SyncResult result = sheetsService.syncDailyScheduleFromSheet(telegramId);
+        SyncResult result = sheetsService.autoSyncSheet(telegramId);
         return ResponseEntity.ok(result);
     }
 
