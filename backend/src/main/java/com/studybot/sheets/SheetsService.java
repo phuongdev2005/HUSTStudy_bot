@@ -4,6 +4,8 @@ import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.studybot.schedule.ClassScheduleRepository;
 import com.studybot.schedule.ClassSession;
+import com.studybot.schedule.DailyActivity;
+import com.studybot.schedule.DailyActivityRepository;
 import com.studybot.schedule.Subject;
 import com.studybot.schedule.SubjectRepository;
 import com.studybot.user.User;
@@ -48,6 +50,7 @@ public class SheetsService {
     private final UserSettingsRepository userSettingsRepository;
     private final SubjectRepository subjectRepository;
     private final ClassScheduleRepository classScheduleRepository;
+    private final DailyActivityRepository dailyActivityRepository;
 
     // Regex trích spreadsheetId từ URL Google Sheets
     private static final Pattern SHEET_ID_PATTERN =
@@ -300,4 +303,204 @@ public class SheetsService {
                 .orElseThrow(() -> new RuntimeException(
                         "Không tìm thấy settings của user " + user.getTelegramId()));
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  DAILY ACTIVITIES – Lịch sinh hoạt toàn ngày
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Đọc Google Sheet format 6 cột → sync vào bảng daily_activities.
+     *
+     * FORMAT (hàng 1 = header, từ hàng 2 = data):
+     *  Cột A     | Cột B   | Cột C   | Cột D              | Cột E      | Cột F
+     *  Thứ       | Bắt đầu | Kết thúc| Hoạt động          | Danh mục   | Ghi chú
+     *  Tất cả    | 00:00   | 06:30   | Ngủ                | Nghỉ ngơi  |
+     *  2         | 07:30   | 09:30   | Giải tích 1        | Học tập    | B1-301
+     */
+    @Transactional
+    public SyncResult syncDailyScheduleFromSheet(Long telegramId) {
+        if (sheetsClient == null) {
+            return SyncResult.error("Google Sheets API chưa được cấu hình trên server.");
+        }
+
+        User user = getUserByTelegramId(telegramId);
+        UserSettings settings = getUserSettings(user);
+
+        String sheetUrl = settings.getGoogleSheetUrl();
+        if (sheetUrl == null || sheetUrl.isBlank()) {
+            return SyncResult.error(
+                "Bạn chưa liên kết Google Sheet!\n" +
+                "Dùng lệnh: /setsheet <link sheet của bạn>");
+        }
+
+        String spreadsheetId = extractSpreadsheetId(sheetUrl);
+        if (spreadsheetId == null) {
+            return SyncResult.error("Link sheet không hợp lệ. Dùng /setsheet để cập nhật link mới.");
+        }
+
+        try {
+            ValueRange response = sheetsClient.spreadsheets().values()
+                    .get(spreadsheetId, "A2:F")
+                    .execute();
+
+            List<List<Object>> rows = response.getValues();
+            if (rows == null || rows.isEmpty()) {
+                return SyncResult.error(
+                    "Sheet trống hoặc chưa có dữ liệu từ hàng 2.\n" +
+                    "Format: Thứ | Giờ bắt | Giờ kết | Hoạt động | Danh mục | Ghi chú");
+            }
+
+            // Xóa toàn bộ lịch cũ của user
+            dailyActivityRepository.deleteAllByUser(user);
+            dailyActivityRepository.flush();
+
+            List<String> errors = new ArrayList<>();
+            int successCount = 0;
+
+            for (int i = 0; i < rows.size(); i++) {
+                List<Object> row = rows.get(i);
+                int rowNum = i + 2;
+                try {
+                    parseDailyRow(row, user, i);
+                    successCount++;
+                } catch (Exception e) {
+                    errors.add("Hàng " + rowNum + ": " + e.getMessage());
+                    log.warn("Lỗi parse hàng {} daily của user {}: {}", rowNum, telegramId, e.getMessage());
+                }
+            }
+
+            settings.setSheetSyncedAt(LocalDateTime.now());
+            userSettingsRepository.save(settings);
+
+            log.info("✅ Sync daily schedule xong user {} – {} hoạt động, {} lỗi",
+                     telegramId, successCount, errors.size());
+
+            return SyncResult.success(successCount, errors);
+
+        } catch (java.io.IOException e) {
+            log.error("Lỗi đọc Google Sheet {} của user {}: {}", spreadsheetId, telegramId, e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("403")) {
+                return SyncResult.error(
+                    "❌ Không có quyền đọc sheet!\n\n" +
+                    "Vào sheet → Share → Anyone with the link → Viewer");
+            }
+            return SyncResult.error("❌ Lỗi kết nối Google Sheets: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Lấy lịch sinh hoạt của 1 ngày cụ thể (kết hợp "Tất cả" + ngày đó).
+     * dayOfWeek: 1=T2 … 7=CN (theo Java DayOfWeek.getValue())
+     */
+    public List<DailyActivityItem> getDailyActivities(Long telegramId, Integer dayOfWeek) {
+        User user = getUserByTelegramId(telegramId);
+        return dailyActivityRepository
+                .findDayActivities(user.getId(), dayOfWeek)
+                .stream()
+                .map(DailyActivityItem::from)
+                .toList();
+    }
+
+    /**
+     * Lấy toàn bộ lịch sinh hoạt của user (tất cả các ngày).
+     */
+    public List<DailyActivityItem> getAllDailyActivities(Long telegramId) {
+        User user = getUserByTelegramId(telegramId);
+        return dailyActivityRepository
+                .findAllByUserId(user.getId())
+                .stream()
+                .map(DailyActivityItem::from)
+                .toList();
+    }
+
+    /**
+     * Parse 1 dòng sheet sang DailyActivity.
+     * Format: [Thứ, Giờ bắt, Giờ kết, Hoạt động, Danh mục, Ghi chú]
+     */
+    private void parseDailyRow(List<Object> row, User user, int sortOrder) {
+        if (row.size() < 4) {
+            throw new IllegalArgumentException("Cần ít nhất 4 cột: Thứ, Giờ bắt, Giờ kết, Hoạt động");
+        }
+
+        String dayStr      = getString(row, 0);
+        String startTime   = getString(row, 1);
+        String endTime     = getString(row, 2);
+        String activity    = getString(row, 3);
+        String category    = row.size() > 4 ? getString(row, 4) : "Khác";
+        String note        = row.size() > 5 ? getString(row, 5) : null;
+
+        if (startTime.isBlank() || endTime.isBlank()) {
+            throw new IllegalArgumentException("Giờ bắt đầu/kết thúc không được để trống");
+        }
+        if (activity.isBlank()) {
+            throw new IllegalArgumentException("Tên hoạt động không được để trống");
+        }
+
+        // dayOfWeek: null = mọi ngày
+        Integer dayOfWeek = parseDayOfWeekNullable(dayStr);
+
+        // Normalize category
+        String cat = normalizeCategory(category);
+
+        DailyActivity da = DailyActivity.builder()
+                .user(user)
+                .dayOfWeek(dayOfWeek)
+                .startTime(startTime.trim())
+                .endTime(endTime.trim())
+                .activity(activity.trim())
+                .category(cat)
+                .note(note != null && !note.isBlank() ? note.trim() : null)
+                .sortOrder(sortOrder)
+                .build();
+
+        dailyActivityRepository.save(da);
+    }
+
+    /**
+     * Parse chuỗi Thứ, trả về null nếu là "Tất cả" / "all" / để trống.
+     */
+    private Integer parseDayOfWeekNullable(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String s = raw.trim().toLowerCase()
+                .replace("tất cả", "all")
+                .replace("tat ca", "all")
+                .replace("mọi ngày", "all")
+                .replace("everyday", "all")
+                .replace("daily", "all");
+
+        if (s.equals("all") || s.equals("*")) return null;  // mọi ngày
+
+        // Tái dùng parseDayOfWeek từ logic cũ
+        s = s.replace("thứ", "").replace("thu", "")
+             .replace(" ", "").replace("_", "");
+        return switch (s) {
+            case "2", "hai", "t2", "monday",    "mon" -> 1;
+            case "3", "ba",  "t3", "tuesday",   "tue" -> 2;
+            case "4", "tu",  "t4", "wednesday", "wed" -> 3;
+            case "5", "nam", "t5", "thursday"         -> 4;
+            case "6", "sau", "t6", "friday",    "fri" -> 5;
+            case "7", "bay", "t7", "saturday",  "sat" -> 6;
+            case "8", "cn",       "sunday",     "sun" -> 7;
+            default -> throw new IllegalArgumentException(
+                "Thứ không hợp lệ: '" + raw + "' (dùng 2-8, T2-CN, hoặc 'Tất cả')");
+        };
+    }
+
+    /**
+     * Chuẩn hóa tên danh mục về dạng chuẩn.
+     */
+    private String normalizeCategory(String raw) {
+        if (raw == null || raw.isBlank()) return "Khác";
+        String s = raw.trim().toLowerCase();
+        if (s.contains("ng") && s.contains("i"))     return "Nghỉ ngơi";
+        if (s.contains("sinh ho"))                   return "Sinh hoạt";
+        if (s.contains("n") && s.contains("u"))      return "Ăn uống";
+        if (s.contains("h") && s.contains("t"))      return "Học tập";
+        if (s.contains("th") && s.contains("d"))     return "Thể dục";
+        if (s.contains("gi") && s.contains("tr"))    return "Giải trí";
+        if (s.contains("di chuy"))                   return "Di chuyển";
+        // Nếu user gõ đúng tiếng Việt
+        return raw.trim().length() > 30 ? raw.trim().substring(0, 30) : raw.trim();
+    }
 }
+

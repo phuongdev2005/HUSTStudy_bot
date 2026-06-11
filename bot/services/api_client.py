@@ -97,6 +97,41 @@ class ApiClient:
         response.raise_for_status()
         return response.json()
 
+    # ── Daily Timeline API ───────────────────────────────────
+
+    async def sync_daily_sheet(self, telegram_id: int) -> dict:
+        """
+        Sync lịch sinh hoạt toàn ngày từ Google Sheet (format 6 cột).
+        POST /api/schedule/{telegramId}/sync-daily
+        Returns: { success, syncedCount, errors, message }
+        """
+        response = await self.client.post(
+            f"/schedule/{telegram_id}/sync-daily",
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def get_daily_schedule(self, telegram_id: int, day: int | None = None) -> list[dict]:
+        """
+        Lấy lịch sinh hoạt hôm nay (kết hợp mọi-ngày + ngày đó).
+        GET /api/schedule/{telegramId}/daily?day={day}
+        Returns: list of { startTime, endTime, activity, category, note, dayOfWeek }
+        """
+        params = {"day": day} if day is not None else {}
+        response = await self.client.get(f"/schedule/{telegram_id}/daily", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    async def get_all_daily_schedule(self, telegram_id: int) -> list[dict]:
+        """
+        Lấy toàn bộ lịch sinh hoạt của user (mọi ngày trong tuần).
+        GET /api/schedule/{telegramId}/daily/all
+        """
+        response = await self.client.get(f"/schedule/{telegram_id}/daily/all")
+        response.raise_for_status()
+        return response.json()
+
     async def close(self):
         """Đóng HTTP client khi shutdown."""
         await self.client.aclose()

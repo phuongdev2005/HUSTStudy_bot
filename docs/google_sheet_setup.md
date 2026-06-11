@@ -1,23 +1,33 @@
-# 📋 Hướng Dẫn Tạo Google Sheet Thời Khóa Biểu
+# 📋 Hướng Dẫn Tạo Google Sheet Lịch Sinh Hoạt Hằng Ngày
 
-## 1. Tạo Google Sheet mới
+## Ý tưởng
 
-1. Vào [Google Sheets](https://sheets.google.com) → **Tạo bảng tính mới**
-2. Đặt tên: `TKB - [Tên bạn] - HK2024.2`
+Mỗi user có **1 Google Sheet riêng** chứa toàn bộ lịch sinh hoạt trong ngày:
+ngủ, vệ sinh, ăn uống, đi học, tập thể dục, giải trí...
+
+Bot sẽ đọc sheet này và hiển thị **timeline đẹp** khi bạn dùng `/schedule`.
 
 ---
 
-## 2. Format bắt buộc
+## 1. Tạo Google Sheet mới
 
-> **Hàng 1 = Header** (giữ nguyên tiêu đề), **Từ hàng 2 = Dữ liệu**
+1. Vào [sheets.google.com](https://sheets.google.com) → **Tạo bảng tính mới (+)**
+2. Đặt tên: `Lịch sinh hoạt – [Tên bạn] – HK2024.2`
 
-| Cột A | Cột B | Cột C | Cột D | Cột E | Cột F | Cột G |
-|-------|-------|-------|-------|-------|-------|-------|
-| Tên môn | Mã môn | Thứ | Giờ bắt đầu | Giờ kết thúc | Phòng | Giảng viên |
+---
 
-### Quy tắc cột **Thứ** (Cột C):
-| Giá trị hợp lệ | Ý nghĩa |
-|----------------|---------|
+## 2. Format bắt buộc (6 cột)
+
+> **Hàng 1 = Header** (giữ nguyên), **Từ hàng 2 = Dữ liệu**
+
+| A – Thứ | B – Giờ bắt | C – Giờ kết | D – Hoạt động | E – Danh mục | F – Ghi chú |
+|---------|------------|------------|--------------|-------------|------------|
+| `Tất cả` / `2`–`8` | `HH:MM` | `HH:MM` | Tên hoạt động | Danh mục | Tùy chọn |
+
+### Cột A – Thứ:
+| Giá trị | Ý nghĩa |
+|---------|---------|
+| `Tất cả` (hoặc `*`, để trống) | Lặp lại **mọi ngày** (ngủ, ăn, vệ sinh…) |
 | `2` hoặc `T2` | Thứ Hai |
 | `3` hoặc `T3` | Thứ Ba |
 | `4` hoặc `T4` | Thứ Tư |
@@ -26,79 +36,104 @@
 | `7` hoặc `T7` | Thứ Bảy |
 | `8` hoặc `CN` | Chủ Nhật |
 
-### Quy tắc cột **Giờ** (Cột D & E):
-- Format: `HH:MM` (24h)
-- Ví dụ: `07:00`, `09:30`, `13:00`
+### Cột E – Danh mục (có emoji tự động):
+| Danh mục | Emoji | Ví dụ |
+|----------|-------|-------|
+| `Nghỉ ngơi` | 😴 | Ngủ, nghỉ trưa |
+| `Sinh hoạt` | 🪥 | Vệ sinh, chuẩn bị ngủ |
+| `Ăn uống` | 🍜 | Ăn sáng, ăn trưa, ăn tối |
+| `Học tập` | 📚 | Lịch học, ôn bài |
+| `Thể dục` | 🏃 | Tập gym, chạy bộ |
+| `Giải trí` | 🎮 | Xem phim, đọc sách |
+| `Di chuyển` | 🚌 | Đi học, đi về |
+| `Khác` | 📌 | Mọi thứ còn lại |
 
 ---
 
-## 3. Dữ liệu mẫu
-
-Sao chép dữ liệu dưới đây vào sheet của bạn (bỏ qua dòng header nếu đã có):
+## 3. Ví dụ lịch mẫu
 
 ```
-Tên môn         | Mã môn  | Thứ | Giờ bắt | Giờ kết | Phòng    | Giảng viên
-Giải tích 1     | MA1010  |  2  | 07:00   | 09:30   | B1-301   | Nguyễn Văn An
-Vật lý ĐC 1    | PH1010  |  2  | 13:00   | 15:30   | C9-101   | Trần Thị Bình
-Lập trình OOP   | IT3080  |  3  | 07:00   | 09:30   | B1-401   | Lê Văn Chính
-Triết học MLN   | SSH1110 |  3  | 13:00   | 15:30   | C7-201   | Phạm Thị Dung
-Giải tích 1     | MA1010  |  4  | 09:45   | 12:15   | B1-301   | Nguyễn Văn An
-Cơ sở dữ liệu   | IT3090  |  4  | 13:00   | 15:30   | B4-Lab1  | Hoàng Văn Em
-Lập trình OOP   | IT3080  |  5  | 07:00   | 09:30   | B4-Lab2  | Lê Văn Chính
-Vật lý ĐC 1    | PH1010  |  5  | 13:00   | 14:30   | C9-201   | Trần Thị Bình
-Cơ sở dữ liệu   | IT3090  |  6  | 07:00   | 09:30   | B1-402   | Hoàng Văn Em
-Tiếng Anh B1    | FL1101  |  6  | 09:45   | 11:15   | D3-201   | Smith John
+Thứ     | Bắt đầu | Kết thúc | Hoạt động         | Danh mục   | Ghi chú
+Tất cả  | 00:00   | 06:30    | Ngủ               | Nghỉ ngơi  |
+Tất cả  | 06:30   | 06:50    | Vệ sinh cá nhân   | Sinh hoạt  |
+Tất cả  | 06:50   | 07:20    | Ăn sáng           | Ăn uống    |
+Tất cả  | 07:20   | 07:40    | Di chuyển đi học  | Di chuyển  | Xe buýt 32
+2       | 07:30   | 09:30    | Giải tích 1       | Học tập    | B1-301
+2       | 09:30   | 11:30    | Lập trình OOP     | Học tập    | B4-Lab1
+2       | 11:30   | 12:30    | Ăn trưa           | Ăn uống    | Canteen C1
+Tất cả  | 18:00   | 18:30    | Ăn tối            | Ăn uống    |
+Tất cả  | 18:30   | 20:00    | Ôn bài            | Học tập    |
+Tất cả  | 22:00   | 00:00    | Ngủ               | Nghỉ ngơi  |
 ```
 
 ---
 
-## 4. Import file CSV có sẵn
+## 4. Import file mẫu có sẵn
 
-Thay vì nhập tay, bạn có thể import file `timetable_template.csv` trong repo:
+File `docs/timetable_template.csv` trong repo đã có sẵn 28 dòng mẫu:
 
 1. Google Sheets → **File** → **Import**
-2. Chọn file `docs/timetable_template.csv`
-3. Chọn **Replace spreadsheet** hoặc **Insert new sheet**
+2. Chọn file `timetable_template.csv`
+3. **Replace spreadsheet** / **Insert new sheet**
 4. Dấu phân cách: **Comma (,)**
 
 ---
 
-## 5. Cấp quyền truy cập cho Bot
+## 5. Cấp quyền cho Bot đọc sheet
 
-> ⚠️ **QUAN TRỌNG**: Bot chỉ đọc được sheet khi bạn cấp quyền!
+> ⚠️ **Bắt buộc** — Bot chỉ đọc được khi bạn cấp quyền!
 
-1. Mở Google Sheet → **Share** (nút xanh góc trên phải)
-2. Trong phần **General access**, chọn **"Anyone with the link"**
-3. Chọn role: **Viewer**
+1. Google Sheet → **Share** (nút xanh góc phải)
+2. **General access** → chọn `Anyone with the link`
+3. Role: `Viewer`
 4. Click **Done**
 
 ---
 
-## 6. Liên kết với Bot
-
-Copy link sheet (dạng `https://docs.google.com/spreadsheets/d/...`) rồi gửi cho bot:
+## 6. Liên kết và đồng bộ với Bot
 
 ```
-/setsheet https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit
+/setsheet https://docs.google.com/spreadsheets/d/YOUR_ID/edit
 ```
-
-Sau đó đồng bộ dữ liệu:
 ```
 /syncsheet
 ```
-
-Xem lịch hôm nay:
 ```
-/schedule
+/schedule      ← xem lịch hôm nay
+/timetable     ← xem lịch cả tuần
 ```
 
 ---
 
-## 7. Lưu ý
+## 7. Kết quả hiển thị trên Bot
 
-- 1 dòng = 1 **buổi học** (cùng môn học 2 buổi/tuần → 2 dòng)
-- Cột **Mã môn** và **Giảng viên** có thể để trống
-- Phòng học có thể để trống
-- Không để trống **Tên môn**, **Thứ**, **Giờ bắt**, **Giờ kết**
+Khi dùng `/schedule`, bot sẽ hiện timeline như sau:
+
+```
+📅 Lịch Thứ Hai, 09/06/2026
+
+00:00–06:30 😴 Ngủ
+06:30–06:50 🪥 Vệ sinh cá nhân
+06:50–07:20 🍜 Ăn sáng
+07:20–07:40 🚌 Di chuyển đến trường  xe buýt 32
+────────────────────
+07:30–09:30 📚 Giải tích 1  B1-301
+09:30–11:30 📚 Lập trình OOP  B4-Lab1
+11:30–12:30 🍜 Ăn trưa  Canteen C1
+12:30–13:00 😴 Nghỉ trưa
+13:00–15:30 📚 Cơ sở dữ liệu  B1-402
+────────────────────
+18:00–18:30 🍜 Ăn tối
+18:30–20:00 📚 Ôn bài
+20:00–21:00 🎮 Giải trí  YouTube / đọc sách
+22:00–00:00 😴 Ngủ
+```
+
+---
+
+## 8. Lưu ý
+
+- Sắp xếp dữ liệu theo **giờ tăng dần** để hiển thị đúng thứ tự
+- Hàng `Tất cả` sẽ hiện **mọi ngày** → dùng cho routine cố định
+- Có thể để trống cột **Ghi chú** và **Danh mục**
 - Sau khi sửa sheet, dùng `/syncsheet` để cập nhật bot
-

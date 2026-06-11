@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -13,10 +15,13 @@ import java.util.Map;
  * Base URL: /api/schedule
  *
  * Endpoints:
- *   POST /api/schedule/{telegramId}/setsheet   → lưu link sheet
- *   POST /api/schedule/{telegramId}/sync        → trigger sync từ sheet
- *   GET  /api/schedule/{telegramId}/today       → lịch học hôm nay
- *   GET  /api/schedule/{telegramId}/week        → lịch học cả tuần
+ *   POST /api/schedule/{telegramId}/setsheet    → lưu link sheet
+ *   POST /api/schedule/{telegramId}/sync         → sync lịch học (format 7 cột cũ)
+ *   POST /api/schedule/{telegramId}/sync-daily   → sync lịch sinh hoạt (format 6 cột mới)
+ *   GET  /api/schedule/{telegramId}/today        → lịch học hôm nay
+ *   GET  /api/schedule/{telegramId}/week         → lịch học cả tuần
+ *   GET  /api/schedule/{telegramId}/daily        → lịch sinh hoạt hôm nay (full timeline)
+ *   GET  /api/schedule/{telegramId}/daily/all    → lịch sinh hoạt toàn bộ
  */
 @RestController
 @RequestMapping("/schedule")
@@ -66,6 +71,46 @@ public class ScheduleSyncController {
         SyncResult result = sheetsService.syncScheduleFromSheet(telegramId);
         // Luôn trả 200 – success/failure nằm trong body để bot xử lý
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Trigger sync lịch sinh hoạt toàn ngày từ Google Sheet (format 6 cột).
+     *
+     * POST /api/schedule/{telegramId}/sync-daily
+     */
+    @PostMapping("/{telegramId}/sync-daily")
+    public ResponseEntity<SyncResult> syncDailySheet(@PathVariable Long telegramId) {
+        SyncResult result = sheetsService.syncDailyScheduleFromSheet(telegramId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Lấy lịch sinh hoạt hôm nay (kết hợp hoạt động mọi ngày + ngày đó).
+     *
+     * GET /api/schedule/{telegramId}/daily
+     * Optional param: ?day=2 (mặc định = hôm nay)
+     */
+    @GetMapping("/{telegramId}/daily")
+    public ResponseEntity<List<DailyActivityItem>> getDaily(
+            @PathVariable Long telegramId,
+            @RequestParam(required = false) Integer day) {
+
+        // Nếu không truyền ?day= thì dùng hôm nay
+        int dayOfWeek = (day != null) ? day
+                : LocalDate.now().getDayOfWeek().getValue(); // 1=Mon..7=Sun
+
+        List<DailyActivityItem> items = sheetsService.getDailyActivities(telegramId, dayOfWeek);
+        return ResponseEntity.ok(items);
+    }
+
+    /**
+     * Lấy toàn bộ lịch sinh hoạt của user (mọi ngày).
+     *
+     * GET /api/schedule/{telegramId}/daily/all
+     */
+    @GetMapping("/{telegramId}/daily/all")
+    public ResponseEntity<List<DailyActivityItem>> getAllDaily(@PathVariable Long telegramId) {
+        return ResponseEntity.ok(sheetsService.getAllDailyActivities(telegramId));
     }
 
     /**
