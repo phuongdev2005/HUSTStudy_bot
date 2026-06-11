@@ -360,6 +360,12 @@ public class SheetsService {
             for (int i = 0; i < rows.size(); i++) {
                 List<Object> row = rows.get(i);
                 int rowNum = i + 2;
+
+                // Skip dòng rỗng và dòng comment bắt đầu bằng #
+                if (row.isEmpty()) continue;
+                String firstCell = row.get(0) != null ? row.get(0).toString().trim() : "";
+                if (firstCell.startsWith("#") || firstCell.isBlank()) continue;
+
                 try {
                     parseDailyRow(row, user, i);
                     successCount++;
@@ -368,6 +374,7 @@ public class SheetsService {
                     log.warn("Lỗi parse hàng {} daily của user {}: {}", rowNum, telegramId, e.getMessage());
                 }
             }
+
 
             settings.setSheetSyncedAt(LocalDateTime.now());
             userSettingsRepository.save(settings);

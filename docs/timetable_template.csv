@@ -1,28 +1,56 @@
 Thứ,Giờ bắt đầu,Giờ kết thúc,Hoạt động,Danh mục,Ghi chú
 Tất cả,00:00,06:30,Ngủ,Nghỉ ngơi,
-Tất cả,06:30,06:50,Vệ sinh cá nhân,Sinh hoạt,
-Tất cả,06:50,07:20,Ăn sáng,Ăn uống,
-Tất cả,07:20,07:40,Di chuyển đến trường,Di chuyển,Xe buýt 32
-2,07:30,09:30,Giải tích 1,Học tập,B1-301
-2,09:30,11:30,Lập trình OOP,Học tập,B4-Lab1
-2,11:30,12:30,Ăn trưa,Ăn uống,Canteen C1
-2,12:30,13:00,Nghỉ trưa,Nghỉ ngơi,
-2,13:00,15:30,Cơ sở dữ liệu,Học tập,B1-402
-2,15:30,16:00,Di chuyển về nhà,Di chuyển,
-3,07:30,09:30,Vật lý đại cương,Học tập,C9-101
-3,09:30,11:00,Triết học Mác Lênin,Học tập,C7-201
-3,11:00,12:30,Ăn trưa,Ăn uống,Canteen C1
-3,12:30,13:00,Nghỉ trưa,Nghỉ ngơi,
-4,07:30,09:30,Giải tích 1,Học tập,B1-301
-4,09:30,11:30,Tiếng Anh B1,Học tập,D3-201
-5,07:30,09:30,Vật lý đại cương,Học tập,C9-201
-5,09:30,11:00,Lập trình OOP,Học tập,B4-Lab2
-6,07:30,09:30,Cơ sở dữ liệu,Học tập,B1-402
-6,09:45,11:15,Tiếng Anh B1,Học tập,D3-201
-7,07:00,08:00,Tập thể dục,Thể dục,Sân vận động HUST
-7,08:00,10:00,Ôn bài tuần,Học tập,Thư viện Tạ Quang Bửu
-Tất cả,18:00,18:30,Ăn tối,Ăn uống,
-Tất cả,18:30,20:00,Ôn bài / Làm bài tập,Học tập,
-Tất cả,20:00,21:00,Giải trí,Giải trí,YouTube / đọc sách
-Tất cả,21:00,22:00,Chuẩn bị ngủ,Sinh hoạt,
-Tất cả,22:00,00:00,Ngủ,Nghỉ ngơi,
+Tất cả,06:30,06:45,Dậy / Tỉnh ngủ,Sinh hoạt,
+Tất cả,06:45,07:05,Vệ sinh cá nhân,Sinh hoạt,Đánh răng - rửa mặt
+Tất cả,07:05,07:30,Ăn sáng,Ăn uống,
+Tất cả,11:30,12:15,Ăn trưa,Ăn uống,Canteen C1
+Tất cả,12:15,13:00,Nghỉ trưa,Nghỉ ngơi,
+Tất cả,17:30,18:00,Di chuyển về nhà,Di chuyển,
+Tất cả,18:00,18:45,Ăn tối,Ăn uống,
+Tất cả,18:45,20:30,Ôn bài / Làm bài tập,Học tập,
+Tất cả,20:30,21:15,Giải trí / Nghỉ ngơi,Giải trí,YouTube - đọc sách
+Tất cả,21:15,21:45,Chuẩn bị ngủ,Sinh hoạt,Vệ sinh tối
+Tất cả,21:45,00:00,Ngủ,Nghỉ ngơi,
+2,07:30,07:45,Di chuyển đến trường,Di chuyển,Xe buýt 32
+2,07:45,09:15,Giải tích 1,Học tập,B1-301 - Thầy Nguyễn Văn An
+2,09:15,09:30,Giải lao,Sinh hoạt,
+2,09:30,11:00,Lập trình OOP,Học tập,B4-Lab1 - Cô Lê Thị Bình
+2,13:00,14:30,Cơ sở dữ liệu,Học tập,B1-402 - Thầy Hoàng Văn Em
+2,14:30,17:30,Tự học / Làm bài tập,Học tập,Thư viện hoặc phòng tự học
+3,07:30,07:45,Di chuyển đến trường,Di chuyển,Xe buýt 32
+3,07:45,09:15,Vật lý đại cương 1,Học tập,C9-101 - Thầy Trần Quốc Hùng
+3,09:15,09:30,Giải lao,Sinh hoạt,
+3,09:30,11:00,Triết học Mác - Lênin,Học tập,C7-201 - Cô Phạm Thị Dung
+3,13:00,15:00,Tự học / Ôn bài,Học tập,Thư viện Tạ Quang Bửu
+3,15:00,17:30,Thể dục / Giải trí chiều,Thể dục,Sân TDTT - bóng đá hoặc gym
+4,07:30,07:45,Di chuyển đến trường,Di chuyển,Xe buýt 32
+4,07:45,09:15,Giải tích 1,Học tập,B1-301 - Thầy Nguyễn Văn An
+4,09:15,09:30,Giải lao,Sinh hoạt,
+4,09:30,11:00,Tiếng Anh B1,Học tập,D3-201 - Thầy Smith John
+4,13:00,15:30,Tự học / Làm đồ án,Học tập,Phòng máy tính B4
+4,15:30,17:30,Đọc sách / Giải trí,Giải trí,Căn tin hoặc công viên
+5,07:30,07:45,Di chuyển đến trường,Di chuyển,Xe buýt 32
+5,07:45,09:15,Vật lý đại cương 1,Học tập,C9-201 - Thầy Trần Quốc Hùng
+5,09:15,09:30,Giải lao,Sinh hoạt,
+5,09:30,11:00,Lập trình OOP,Học tập,B4-Lab2 - Cô Lê Thị Bình
+5,13:00,15:30,Tự học / Ôn thi,Học tập,Thư viện Tạ Quang Bửu
+5,15:30,17:30,Tự do / Câu lạc bộ,Giải trí,CLB Âm nhạc hoặc Lập trình
+6,07:30,07:45,Di chuyển đến trường,Di chuyển,Xe buýt 32
+6,07:45,09:15,Cơ sở dữ liệu,Học tập,B1-402 - Thầy Hoàng Văn Em
+6,09:15,09:30,Giải lao,Sinh hoạt,
+6,09:30,11:00,Tiếng Anh B1,Học tập,D3-201 - Thầy Smith John
+6,13:00,15:00,Tự học / Làm bài tập,Học tập,
+6,15:00,17:30,Giải trí / Đi chơi cùng bạn,Giải trí,
+7,06:30,07:30,Tập thể dục buổi sáng,Thể dục,Sân vận động HUST - chạy bộ
+7,07:30,08:15,Vệ sinh + Ăn sáng,Sinh hoạt,
+7,08:15,10:30,Ôn bài tuần / Làm bài tập,Học tập,Thư viện Tạ Quang Bửu
+7,10:30,11:30,Nghỉ ngơi / Đọc sách nhẹ,Giải trí,
+7,13:00,15:30,Học nhóm,Học tập,Phòng thảo luận thư viện
+7,15:30,18:00,Đi chơi / Mua sắm,Giải trí,Vincom hoặc AEON Mall
+8,07:00,08:30,Ngủ nướng,Nghỉ ngơi,Ngày nghỉ
+8,08:30,09:00,Vệ sinh cá nhân,Sinh hoạt,
+8,09:00,09:30,Ăn sáng muộn,Ăn uống,
+8,09:30,11:30,Dọn dẹp phòng / Giặt quần áo,Sinh hoạt,
+8,13:00,15:00,Xem phim / Nghỉ ngơi,Giải trí,Netflix hoặc YouTube
+8,15:00,17:00,Lên kế hoạch tuần mới,Học tập,Viết to-do list
+8,17:00,18:00,Gọi điện / Video call gia đình,Giải trí,
