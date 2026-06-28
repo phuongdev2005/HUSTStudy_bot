@@ -41,18 +41,6 @@ public class UserService {
     }
 
     /**
-     * Lấy thông tin user theo Telegram ID.
-     */
-    @Transactional(readOnly = true)
-    public UserResponse getByTelegramId(Long telegramId) {
-        User user = userRepository.findByTelegramId(telegramId)
-                .orElseThrow(() ->
-                    new RuntimeException("Không tìm thấy user với telegramId: " + telegramId)
-                );
-        return UserResponse.from(user);
-    }
-
-    /**
      * Kiểm tra user đã đăng ký chưa.
      */
     @Transactional(readOnly = true)
@@ -86,7 +74,6 @@ public class UserService {
         if (req.getNotifyClassRemind()     != null) s.setNotifyClassRemind(req.getNotifyClassRemind());
         if (req.getNotifyDeadline()        != null) s.setNotifyDeadline(req.getNotifyDeadline());
         if (req.getNotifyExam()            != null) s.setNotifyExam(req.getNotifyExam());
-        if (req.getNotifyBudgetWarn()      != null) s.setNotifyBudgetWarn(req.getNotifyBudgetWarn());
         if (req.getNotifyHustEvents()      != null) s.setNotifyHustEvents(req.getNotifyHustEvents());
         if (req.getClassRemindBefore()     != null) s.setClassRemindBefore(req.getClassRemindBefore());
         if (req.getDeadlineRemindBefore()  != null) s.setDeadlineRemindBefore(req.getDeadlineRemindBefore());
@@ -115,18 +102,6 @@ public class UserService {
         });
     }
 
-    /**
-     * User unblock hoặc /start lại → set isActive = true.
-     * registerOrUpdate() cũng đã làm điều này, method này để dùng riêng nếu cần.
-     */
-    @Transactional
-    public void activate(Long telegramId) {
-        userRepository.findByTelegramId(telegramId).ifPresent(user -> {
-            user.setIsActive(true);
-            userRepository.save(user);
-        });
-    }
-
     // ── Private helpers ────────────────────────────────────────────
 
     private User createNewUser(UserRequest request) {
@@ -134,8 +109,6 @@ public class UserService {
                 .telegramId(request.getTelegramId())
                 .username(request.getUsername())
                 .fullName(request.getFullName())
-                .languageCode(request.getLanguageCode())
-                .timezone(request.getTimezone())
                 .isActive(true)
                 .build();
 
@@ -144,7 +117,6 @@ public class UserService {
                 .notifyClassRemind(true)
                 .notifyDeadline(true)
                 .notifyExam(true)
-                .notifyBudgetWarn(true)
                 .notifyDailySummary(true)
                 .classRemindBefore((short) 30)
                 .deadlineRemindBefore((short) 1440)

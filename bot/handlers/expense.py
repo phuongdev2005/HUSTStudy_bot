@@ -330,11 +330,13 @@ async def scan_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
                 image_file_id = pending["image_file_id"],
                 ai_confidence = pending["confidence"],
             )
+            # Dung ten danh muc thuc su da luu (backend co the fallback ve Khac)
+            saved_category = result.get("categoryName") or pending["category"]
             context.user_data.pop("pending_scan", None)
             await query.edit_message_text(
                 f"✅ *Đã lưu chi tiêu!*\n\n"
                 f"💰 {fmt_vnd(pending['amount'])} – {pending['description']}\n"
-                f"📂 {pending['category']}\n\n"
+                f"📂 {saved_category}\n\n"
                 f"_Dùng /report để xem tổng tháng_",
                 parse_mode="Markdown"
             )
@@ -371,7 +373,7 @@ async def edit_amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop("waiting_edit_amount", None)
 
     try:
-        await api.confirm_scan(
+        result = await api.confirm_scan(
             telegram_id   = tid,
             amount        = amount,
             category_name = pending["category"],
@@ -379,11 +381,13 @@ async def edit_amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             image_file_id = pending["image_file_id"],
             ai_confidence = pending["confidence"],
         )
+        # Dung ten danh muc thuc su da luu (backend co the fallback ve Khac)
+        saved_category = result.get("categoryName") or pending["category"]
         context.user_data.pop("pending_scan", None)
         await update.message.reply_text(
             f"✅ *Đã lưu chi tiêu!*\n\n"
             f"💰 {fmt_vnd(amount)} – {pending['description']}\n"
-            f"📂 {pending['category']}\n\n"
+            f"📂 {saved_category}\n\n"
             f"_Dùng /report để xem tổng tháng_",
             parse_mode="Markdown"
         )

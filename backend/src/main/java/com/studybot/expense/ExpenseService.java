@@ -12,10 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Service xử lý chi tiêu cá nhân.
@@ -24,8 +21,7 @@ import java.util.Optional;
  *  1. Thêm giao dịch (nhập tay hoặc từ kết quả AI scan)
  *  2. Lịch sử giao dịch
  *  3. Báo cáo tháng (tổng chi, tổng thu, theo danh mục)
- *  4. Quản lý hạn mức ngân sách + check cảnh báo
- *  5. Lấy danh sách danh mục
+ *  4. Lấy danh sách danh mục
  */
 @Service
 @RequiredArgsConstructor
@@ -38,7 +34,6 @@ public class ExpenseService {
     private final UserRepository              userRepository;
     private final ExpenseRepository           expenseRepository;
     private final ExpenseCategoryRepository   categoryRepository;
-    private final BudgetRepository            budgetRepository;
 
     // ═══════════════════════════════════════════════════════════
     //  DTO nội bộ
@@ -64,16 +59,7 @@ public class ExpenseService {
             String      note,
             LocalDateTime transactionAt,
             String      source,
-            BigDecimal  aiConfidence,
-            BudgetWarning budgetWarning  // cảnh báo ngân sách (null nếu không có)
-    ) {}
-
-    public record BudgetWarning(
-            String      categoryName,
-            BigDecimal  used,
-            BigDecimal  limit,
-            int         percentage,
-            boolean     exceeded
+            BigDecimal  aiConfidence
     ) {}
 
     public record CategoryItem(Integer id, String name, String icon, String type) {}
@@ -92,8 +78,6 @@ public class ExpenseService {
             String     categoryName,
             String     categoryIcon,
             BigDecimal amount,
-            BigDecimal budget,
-            int        percentage,
             int        transactionCount
     ) {}
 
@@ -103,7 +87,7 @@ public class ExpenseService {
 
     /**
      * Thêm giao dịch thu/chi mới.
-     * Tự động match danh mục nếu chỉ có tên, check budget sau khi lưu.
+     * Thêm giao dịch thu/chi mới. Tự động match danh mục nếu chỉ có tên.
      */
     @Transactional
     public ExpenseResponse addExpense(AddExpenseRequest req) {
@@ -143,13 +127,7 @@ public class ExpenseService {
         log.info("✅ Thêm giao dịch {} {}đ [{}] cho user {}",
                 type, req.amount(), category.getName(), req.telegramId());
 
-        // Check budget warning
-        BudgetWarning warning = null;
-        if (type == Expense.ExpenseType.EXPENSE) {
-            warning = checkBudgetWarning(user, category);
-        }
-
-        return toResponse(expense, warning);
+        return toResponse(expense);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -177,7 +155,7 @@ public class ExpenseService {
         if (limit > 0 && expenses.size() > limit) {
             expenses = expenses.subList(0, limit);
         }
-        return expenses.stream().map(e -> toResponse(e, null)).toList();
+        return expenses.stream().map(this::toResponse).toList();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -197,21 +175,14 @@ public class ExpenseService {
 
         // Tổng chi theo từng danh mục
         List<Object[]> byCat = expenseRepository.sumByCategory(user, m, y);
-        List<Budget> budgets  = budgetRepository.findByUserAndMonthAndYear(user, m, y);
-        Map<Integer, BigDecimal> budgetMap = new LinkedHashMap<>();
-        budgets.forEach(b -> budgetMap.put(b.getCategory().getId(), b.getAmount()));
 
         List<CategoryStat> stats = new ArrayList<>();
         for (Object[] row : byCat) {
             Integer catId  = (Integer) row[0];
             BigDecimal amt = (BigDecimal) row[1];
-            categoryRepository.findById(catId).ifPresent(cat -> {
-                BigDecimal bgt = budgetMap.getOrDefault(catId, BigDecimal.ZERO);
-                int pct = bgt.compareTo(BigDecimal.ZERO) > 0
-                        ? amt.multiply(BigDecimal.valueOf(100)).divide(bgt, 0, java.math.RoundingMode.HALF_UP).intValue()
-                        : 0;
-                stats.add(new CategoryStat(catId, cat.getName(), cat.getIcon(), amt, bgt, pct, 0));
-            });
+            categoryRepository.findById(catId).ifPresent(cat ->
+                stats.add(new CategoryStat(catId, cat.getName(), cat.getIcon(), amt, 0))
+            );
         }
         // Sort giảm dần theo số tiền
         stats.sort((a, b) -> b.amount().compareTo(a.amount()));
@@ -220,43 +191,7 @@ public class ExpenseService {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  4. Hạn mức ngân sách
-    // ═══════════════════════════════════════════════════════════
-
-    @Transactional
-    public Budget setBudget(Long telegramId, Integer categoryId, BigDecimal amount,
-                             Integer month, Integer year) {
-        User user = getUser(telegramId);
-        ExpenseCategory category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Danh mục không tồn tại: " + categoryId));
-
-        LocalDate now = LocalDate.now();
-        int m = (month != null) ? month : now.getMonthValue();
-        int y = (year  != null) ? year  : now.getYear();
-
-        Optional<Budget> existing = budgetRepository.findByUserAndCategoryAndMonthAndYear(user, category, m, y);
-
-        Budget budget = existing.orElseGet(() -> Budget.builder()
-                .user(user).category(category).month(m).year(y).build());
-        budget.setAmount(amount);
-        budget.setIsNotified80(false);
-        budget.setIsNotified100(false);
-
-        return budgetRepository.save(budget);
-    }
-
-    public List<Budget> getBudgets(Long telegramId, Integer month, Integer year) {
-        User user = getUser(telegramId);
-        LocalDate now = LocalDate.now();
-        return budgetRepository.findByUserAndMonthAndYear(
-                user,
-                (month != null) ? month : now.getMonthValue(),
-                (year  != null) ? year  : now.getYear()
-        );
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  5. Danh mục
+    //  4. Danh mục
     // ═══════════════════════════════════════════════════════════
 
     @Transactional
@@ -366,7 +301,7 @@ public class ExpenseService {
         if (note != null) {
             expense.setNote(note.isBlank() ? null : note.trim());
         }
-        return toResponse(expenseRepository.save(expense), null);
+        return toResponse(expenseRepository.save(expense));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -434,36 +369,7 @@ public class ExpenseService {
         return categoryRepository.save(category);
     }
 
-    private BudgetWarning checkBudgetWarning(User user, ExpenseCategory category) {
-        LocalDate now = LocalDate.now();
-        Optional<Budget> budgetOpt = budgetRepository.findByUserAndCategoryAndMonthAndYear(
-                user, category, now.getMonthValue(), now.getYear());
-        if (budgetOpt.isEmpty()) return null;
-
-        Budget budget = budgetOpt.get();
-        BigDecimal used = nullSafe(expenseRepository.sumByType(
-                user, Expense.ExpenseType.EXPENSE, now.getMonthValue(), now.getYear()));
-
-        // Chỉ sum category này
-        List<Object[]> byCat = expenseRepository.sumByCategory(user, now.getMonthValue(), now.getYear());
-        BigDecimal catUsed = byCat.stream()
-                .filter(r -> category.getId().equals(r[0]))
-                .map(r -> (BigDecimal) r[1])
-                .findFirst()
-                .orElse(BigDecimal.ZERO);
-
-        if (budget.getAmount().compareTo(BigDecimal.ZERO) == 0) return null;
-        int pct = catUsed.multiply(BigDecimal.valueOf(100))
-                .divide(budget.getAmount(), 0, java.math.RoundingMode.HALF_UP).intValue();
-
-        if (pct >= 80) {
-            return new BudgetWarning(
-                    category.getName(), catUsed, budget.getAmount(), pct, pct >= 100);
-        }
-        return null;
-    }
-
-    private ExpenseResponse toResponse(Expense e, BudgetWarning warning) {
+    private ExpenseResponse toResponse(Expense e) {
         return new ExpenseResponse(
                 e.getId(),
                 e.getType().name(),
@@ -473,8 +379,7 @@ public class ExpenseService {
                 e.getNote(),
                 e.getTransactionAt(),
                 e.getSource().name(),
-                e.getAiConfidence(),
-                warning
+                e.getAiConfidence()
         );
     }
 

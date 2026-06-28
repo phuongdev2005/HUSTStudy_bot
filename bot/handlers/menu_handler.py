@@ -847,7 +847,7 @@ async def _cb_manage_categories(query, tid: int, context):
                 buttons.append([
                     InlineKeyboardButton(f"{icon} {name}", callback_data=f"catdetail_{cat_id}")
                 ])
-                lines.append(f"ðŸ“‚ {icon} {name}")
+                lines.append(f"📂 {icon} {name}")
                 continue
 
             buttons.append([
@@ -863,7 +863,7 @@ async def _cb_manage_categories(query, tid: int, context):
             InlineKeyboardButton("◀️ Quay lại", callback_data="expense_back")
         ])
 
-        text = "\n".join(lines) + "\n\n• Bấm *Tên danh mục* để chỉnh sửa (đổi tên/icon).\n• Bấm *❌* để xóa danh mục."
+        text = "\n".join(lines) + "\n\n• Bấm *Tên danh mục* để xem các giao dịch.\n• Trong từng danh mục có thể sửa/xóa giao dịch.\n• Bấm *❌* để xóa danh mục tự tạo."
         await query.edit_message_text(
             text,
             parse_mode="Markdown",

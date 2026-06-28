@@ -26,8 +26,6 @@ public class UserResponse {
     private Long    telegramId;
     private String  username;
     private String  fullName;
-    private String  languageCode;
-    private String  timezone;
     private Boolean isActive;
     private String  createdAt;   // ISO string — tránh Jackson LocalDateTime issue
 
@@ -40,8 +38,6 @@ public class UserResponse {
         res.setTelegramId(user.getTelegramId());
         res.setUsername(user.getUsername());
         res.setFullName(user.getFullName());
-        res.setLanguageCode(user.getLanguageCode());
-        res.setTimezone(user.getTimezone());
         res.setIsActive(user.getIsActive());
         res.setCreatedAt(user.getCreatedAt() != null
                 ? user.getCreatedAt().toString() : null);

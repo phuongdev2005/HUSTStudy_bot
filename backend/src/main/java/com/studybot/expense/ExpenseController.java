@@ -22,8 +22,6 @@ import java.util.Map;
  *   GET    /api/expense/history          → Lịch sử giao dịch
  *   GET    /api/expense/report           → Báo cáo tháng
  *   GET    /api/expense/categories       → Danh sách danh mục
- *   POST   /api/expense/budget           → Đặt hạn mức
- *   GET    /api/expense/budget           → Xem hạn mức tháng
  *   DELETE /api/expense/{id}             → Xóa giao dịch
  */
 @RestController
@@ -191,61 +189,7 @@ public class ExpenseController {
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  7. Đặt hạn mức ngân sách
-    //
-    //  POST /api/expense/budget
-    //  Body: { telegramId, categoryId, amount, month?, year? }
-    // ─────────────────────────────────────────────────────────────
-    @PostMapping("/budget")
-    public ResponseEntity<Map<String, Object>> setBudget(
-            @RequestBody Map<String, Object> body) {
-
-        Budget budget = expenseService.setBudget(
-                getLong(body, "telegramId"),
-                getInt(body, "categoryId"),
-                getBigDecimal(body, "amount"),
-                getInt(body, "month"),
-                getInt(body, "year")
-        );
-
-        return ResponseEntity.status(201).body(Map.of(
-                "id",       budget.getId(),
-                "category", budget.getCategory().getName(),
-                "amount",   budget.getAmount(),
-                "month",    budget.getMonth(),
-                "year",     budget.getYear(),
-                "message",  "✅ Đã đặt hạn mức " + formatVnd(budget.getAmount()) +
-                            " cho " + budget.getCategory().getName()
-        ));
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    //  8. Xem hạn mức tháng
-    //
-    //  GET /api/expense/budget?telegramId=xxx&month=6&year=2026
-    // ─────────────────────────────────────────────────────────────
-    @GetMapping("/budget")
-    public ResponseEntity<List<Map<String, Object>>> getBudgets(
-            @RequestParam Long    telegramId,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year) {
-
-        List<Budget> budgets = expenseService.getBudgets(telegramId, month, year);
-        List<Map<String, Object>> result = budgets.stream().map(b -> Map.<String, Object>of(
-                "id",           b.getId(),
-                "category",     b.getCategory().getName(),
-                "icon",         b.getCategory().getIcon() != null ? b.getCategory().getIcon() : "",
-                "amount",       b.getAmount(),
-                "month",        b.getMonth(),
-                "year",         b.getYear(),
-                "warnThreshold",b.getWarnThreshold()
-        )).toList();
-
-        return ResponseEntity.ok(result);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    //  9. Xóa giao dịch
+    //  7. Xóa giao dịch
     //
     //  DELETE /api/expense/{id}?telegramId=xxx
     // ─────────────────────────────────────────────────────────────

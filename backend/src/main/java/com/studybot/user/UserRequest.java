@@ -26,8 +26,4 @@ public class UserRequest {
 
     @NotBlank(message = "fullName không được để trống")
     private String fullName;
-
-    private String languageCode = "vi";
-
-    private String timezone = "Asia/Ho_Chi_Minh";
 }

@@ -36,19 +36,6 @@ public class UserController {
         return ResponseEntity.status(201).body(response);
     }
 
-    /**
-     * Lấy thông tin user theo Telegram ID.
-     *
-     * GET /api/users/telegram/{telegramId}
-     *
-     * Response:
-     *   200 OK  → { "id": 1, "fullName": "Phương Dev", ... }
-     *   404     → Nếu không tìm thấy
-     */
-    @GetMapping("/telegram/{telegramId}")
-    public ResponseEntity<UserResponse> getByTelegramId(@PathVariable Long telegramId) {
-        return ResponseEntity.ok(userService.getByTelegramId(telegramId));
-    }
 
     /**
      * Kiểm tra user đã tồn tại chưa.
@@ -95,19 +82,6 @@ public class UserController {
     @PatchMapping("/{telegramId}/deactivate")
     public ResponseEntity<Void> deactivate(@PathVariable Long telegramId) {
         userService.deactivate(telegramId);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * User unblock / /start lại → đánh dấu isActive = true.
-     * (Thường registerOrUpdate đã xử lý, endpoint này để dùng riêng nếu cần.)
-     *
-     * PATCH /api/users/{telegramId}/activate
-     * Response: 204 No Content
-     */
-    @PatchMapping("/{telegramId}/activate")
-    public ResponseEntity<Void> activate(@PathVariable Long telegramId) {
-        userService.activate(telegramId);
         return ResponseEntity.noContent().build();
     }
 

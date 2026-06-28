@@ -35,16 +35,6 @@ class ApiClient:
         response.raise_for_status()  # Raise lỗi nếu status >= 400
         return response.json()
 
-    async def get_user(self, telegram_id: int) -> dict | None:
-        """
-        Lấy thông tin user. Trả về None nếu chưa đăng ký.
-        """
-        response = await self.client.get(f"/users/telegram/{telegram_id}")
-        if response.status_code == 404:
-            return None
-        response.raise_for_status()
-        return response.json()
-
     async def user_exists(self, telegram_id: int) -> bool:
         """Kiểm tra user đã đăng ký chưa."""
         response = await self.client.get(f"/users/exists/{telegram_id}")
@@ -125,33 +115,6 @@ class ApiClient:
         r.raise_for_status()
         return r.json()
 
-    async def set_budget(self, telegram_id: int, category_id: int, amount: int,
-                         month: int | None = None, year: int | None = None) -> dict:
-        """Đặt hoặc cập nhật ngân sách cho danh mục."""
-        payload = {
-            "telegramId": telegram_id,
-            "categoryId": category_id,
-            "amount": amount,
-        }
-        if month is not None:
-            payload["month"] = month
-        if year is not None:
-            payload["year"] = year
-        r = await self.client.post("/expense/budget", json=payload)
-        r.raise_for_status()
-        return r.json()
-
-    async def get_budgets(self, telegram_id: int, month: int | None = None,
-                          year: int | None = None) -> list[dict]:
-        """Lấy danh sách ngân sách theo tháng/năm."""
-        params = {"telegramId": telegram_id}
-        if month is not None:
-            params["month"] = month
-        if year is not None:
-            params["year"] = year
-        r = await self.client.get("/expense/budget", params=params)
-        r.raise_for_status()
-        return r.json()
 
     # ── Schedule / Google Sheet API ───────────────────────────
 
@@ -231,17 +194,6 @@ class ApiClient:
         r = await self.client.get("/users/all-with-notifications")
         r.raise_for_status()
         return r.json()
-
-    async def get_daily_schedule(self, telegram_id: int, day_of_week: int) -> list[dict]:
-        """
-        Lấy lịch sinh hoạt hôm nay (kết hợp mọi-ngày + ngày đó).
-        GET /api/schedule/{telegramId}/daily?day={day}
-        Returns: list of { startTime, endTime, activity, category, note, dayOfWeek }
-        """
-        params = {"day": day_of_week}
-        response = await self.client.get(f"/schedule/{telegram_id}/daily", params=params)
-        response.raise_for_status()
-        return response.json()
 
     async def get_all_daily_schedule(self, telegram_id: int) -> list[dict]:
         """

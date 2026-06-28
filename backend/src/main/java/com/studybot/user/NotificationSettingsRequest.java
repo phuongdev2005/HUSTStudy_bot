@@ -17,7 +17,6 @@ public class NotificationSettingsRequest {
     private Boolean notifyClassRemind;    // Nhắc trước buổi học
     private Boolean notifyDeadline;       // Nhắc deadline sắp hết hạn
     private Boolean notifyExam;           // Nhắc lịch thi sắp tới
-    private Boolean notifyBudgetWarn;     // Cảnh báo vượt ngân sách
     private Boolean notifyHustEvents;     // tự động sync sự kiện HUST
 
     // Cấu hình thời gian

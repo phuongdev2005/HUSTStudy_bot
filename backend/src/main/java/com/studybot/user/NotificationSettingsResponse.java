@@ -12,7 +12,6 @@ public class NotificationSettingsResponse {
     private final boolean notifyClassRemind;
     private final boolean notifyDeadline;
     private final boolean notifyExam;
-    private final boolean notifyBudgetWarn;
     private final boolean notifyHustEvents;
 
     private final String dailySummaryTime;     // "HH:mm"
@@ -25,7 +24,6 @@ public class NotificationSettingsResponse {
         this.notifyClassRemind    = Boolean.TRUE.equals(s.getNotifyClassRemind());
         this.notifyDeadline       = Boolean.TRUE.equals(s.getNotifyDeadline());
         this.notifyExam           = Boolean.TRUE.equals(s.getNotifyExam());
-        this.notifyBudgetWarn     = Boolean.TRUE.equals(s.getNotifyBudgetWarn());
         this.notifyHustEvents     = Boolean.TRUE.equals(s.getNotifyHustEvents());
         this.dailySummaryTime     = s.getDailySummaryTime() != null
                                     ? s.getDailySummaryTime().toString().substring(0, 5)

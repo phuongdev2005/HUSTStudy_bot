@@ -42,10 +42,6 @@ public class UserSettings {
     private Boolean notifyExam = true;
 
     @Builder.Default
-    @Column(name = "notify_budget_warn")
-    private Boolean notifyBudgetWarn = true;
-
-    @Builder.Default
     @Column(name = "notify_daily_summary")
     private Boolean notifyDailySummary = true;
 
