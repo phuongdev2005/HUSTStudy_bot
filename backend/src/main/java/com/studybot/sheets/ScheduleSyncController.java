@@ -97,11 +97,14 @@ public class ScheduleSyncController {
             @PathVariable Long telegramId,
             @RequestParam(required = false) Integer day) {
 
-        // Nếu không truyền ?day= thì dùng hôm nay
-        int dayOfWeek = (day != null) ? day
-                : LocalDate.now().getDayOfWeek().getValue(); // 1=Mon..7=Sun
+        LocalDate targetDate;
+        if (day != null) {
+            targetDate = LocalDate.now().with(java.time.DayOfWeek.of(day));
+        } else {
+            targetDate = LocalDate.now();
+        }
 
-        List<DailyActivityItem> items = sheetsService.getDailyActivities(telegramId, dayOfWeek);
+        List<DailyActivityItem> items = sheetsService.getDailyActivities(telegramId, targetDate);
         return ResponseEntity.ok(items);
     }
 

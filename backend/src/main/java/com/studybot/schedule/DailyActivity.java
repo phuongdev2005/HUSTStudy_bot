@@ -4,6 +4,7 @@ import com.studybot.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -46,16 +47,22 @@ public class DailyActivity {
     @Column(name = "activity", nullable = false, length = 255)
     private String activity;            // Tên hoạt động
 
-    @Builder.Default
     @Column(name = "category", nullable = false, length = 50)
     private String category = "Khác";  // Danh mục
+
+    /** Manual getter vì Lombok đôi khi bỏ qua field có default value. */
+    public String getCategory() {
+        return category != null ? category : "Khác";
+    }
 
     @Column(name = "note", length = 500)
     private String note;                // Ghi chú (phòng, địa điểm...)
 
-    @Builder.Default
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
+
+    @Column(name = "date")
+    private LocalDate date;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,6 +72,8 @@ public class DailyActivity {
 
     @PrePersist
     protected void onCreate() {
+        if (category == null) category = "Khác";
+        if (sortOrder == null) sortOrder = 0;
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

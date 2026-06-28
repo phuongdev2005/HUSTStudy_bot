@@ -26,9 +26,10 @@ public class DailyActivityItem {
     private final String activity;     // Tên hoạt động
     private final String category;     // Danh mục
     private final String note;         // Ghi chú
+    private final String date;         // yyyy-MM-dd (null if recurring)
 
     private DailyActivityItem(Long id, Integer dayOfWeek, String startTime, String endTime,
-                               String activity, String category, String note) {
+                               String activity, String category, String note, String date) {
         this.id         = id;
         this.dayOfWeek  = dayOfWeek;
         this.startTime  = startTime;
@@ -36,6 +37,7 @@ public class DailyActivityItem {
         this.activity   = activity;
         this.category   = category;
         this.note       = note;
+        this.date       = date;
     }
 
     /** Factory từ DailyActivity entity. */
@@ -47,7 +49,8 @@ public class DailyActivityItem {
                 a.getEndTime(),
                 a.getActivity(),
                 a.getCategory(),
-                a.getNote()
+                a.getNote(),
+                a.getDate() != null ? a.getDate().toString() : null
         );
     }
 }

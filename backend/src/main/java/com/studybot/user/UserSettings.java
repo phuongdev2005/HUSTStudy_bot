@@ -49,6 +49,15 @@ public class UserSettings {
     @Column(name = "notify_daily_summary")
     private Boolean notifyDailySummary = true;
 
+    /** Tự động import sự kiện HUST CTSV vào deadline mỗi ngày. */
+    @Builder.Default
+    @Column(name = "notify_hust_events")
+    private Boolean notifyHustEvents = true;
+
+    /** JSON array các AId đã được import, tránh trùng lặp. */
+    @Column(name = "hust_synced_event_ids", length = 2000)
+    private String hustSyncedEventIds;  // e.g. "[101,202,303]"
+
     // ── Thời gian và khoảng cách nhắc ────────────────────────
     @Builder.Default
     @Column(name = "daily_summary_time")
@@ -72,6 +81,21 @@ public class UserSettings {
 
     @Column(name = "sheet_synced_at")
     private LocalDateTime sheetSyncedAt;   // Lần cuối sync từ sheet thành công
+
+    // ── Groq AI Key cá nhân ──────────────────────────────────────────────
+
+    /** Groq API Key riêng của user. Nếu có, dùng key này thay vì quota miễn phí. */
+    @Column(name = "groq_api_key", length = 255)
+    private String groqApiKey;
+
+    /** Số lượt scan AI miễn phí đã dùng hôm nay (reset mỗi ngày). */
+    @Builder.Default
+    @Column(name = "ai_free_uses_today", columnDefinition = "TINYINT")
+    private Short aiFreeUsesToday = 0;
+
+    /** Ngày đã ghi nhận ai_free_uses_today (dùng để reset về 0 sang ngày mới). */
+    @Column(name = "ai_free_uses_date")
+    private java.time.LocalDate aiFreeUsesDate;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

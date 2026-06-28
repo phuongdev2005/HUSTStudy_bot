@@ -45,8 +45,30 @@ services:
       DB_HOST: mysql   # override để dùng tên service thay vì localhost
     ports:
       - "${SERVER_PORT:-8081}:8081"
-    profiles:
-      - full   # Chỉ chạy khi: docker compose --profile full up
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1",
+             "--spider", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  # ─────────────────────────────────────────
+  #  Python Telegram Bot
+  # ─────────────────────────────────────────
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: huststudy_bot
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: http://backend:8081/api   # dùng tên service Docker
 
   # ─────────────────────────────────────────
   #  phpMyAdmin – GUI quản lý DB (dev only)

@@ -51,6 +51,108 @@ class ApiClient:
         response.raise_for_status()
         return response.json()
 
+    async def deactivate_user(self, telegram_id: int) -> None:
+        """
+        User block bot → đánh dấu isActive = false.
+        PATCH /users/{telegramId}/deactivate
+        """
+        r = await self.client.patch(f"/users/{telegram_id}/deactivate")
+        r.raise_for_status()
+
+    async def get_categories(self, telegram_id: int) -> list[dict]:
+        """Lấy danh sách danh mục (hệ thống + riêng của user)."""
+        r = await self.client.get("/expense/categories", params={"telegramId": telegram_id})
+        r.raise_for_status()
+        return r.json()
+
+    async def add_category(self, telegram_id: int, name: str,
+                           icon: str = "📦", type_: str = "EXPENSE") -> dict:
+        """Tạo danh mục chi tiêu riêng của user."""
+        r = await self.client.post("/expense/categories", json={
+            "telegramId": telegram_id,
+            "name":       name,
+            "icon":       icon,
+            "type":       type_,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def delete_category(self, telegram_id: int, category_id: int) -> dict:
+        """Xóa danh mục riêng của user (không xóa được danh mục hệ thống)."""
+        r = await self.client.delete(
+            f"/expense/categories/{category_id}",
+            params={"telegramId": telegram_id}
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def update_category(self, telegram_id: int, category_id: int,
+                              name: str | None = None, icon: str | None = None) -> dict:
+        """Cập nhật tên / icon danh mục riêng của user."""
+        r = await self.client.put(
+            f"/expense/categories/{category_id}",
+            json={
+                "telegramId": telegram_id,
+                "name":       name,
+                "icon":       icon,
+            }
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def delete_expense(self, telegram_id: int, expense_id: int) -> dict:
+        """Xóa một giao dịch chi tiêu/thu nhập của user."""
+        r = await self.client.delete(
+            f"/expense/{expense_id}",
+            params={"telegramId": telegram_id},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    async def update_expense(self, telegram_id: int, expense_id: int,
+                             amount: int | None = None,
+                             category_name: str | None = None,
+                             note: str | None = None) -> dict:
+        """Cap nhat so tien / danh muc / ghi chu cua giao dich."""
+        payload = {"telegramId": telegram_id}
+        if amount is not None:
+            payload["amount"] = amount
+        if category_name is not None:
+            payload["categoryName"] = category_name
+        if note is not None:
+            payload["note"] = note
+        r = await self.client.put(f"/expense/{expense_id}", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+    async def set_budget(self, telegram_id: int, category_id: int, amount: int,
+                         month: int | None = None, year: int | None = None) -> dict:
+        """Đặt hoặc cập nhật ngân sách cho danh mục."""
+        payload = {
+            "telegramId": telegram_id,
+            "categoryId": category_id,
+            "amount": amount,
+        }
+        if month is not None:
+            payload["month"] = month
+        if year is not None:
+            payload["year"] = year
+        r = await self.client.post("/expense/budget", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+    async def get_budgets(self, telegram_id: int, month: int | None = None,
+                          year: int | None = None) -> list[dict]:
+        """Lấy danh sách ngân sách theo tháng/năm."""
+        params = {"telegramId": telegram_id}
+        if month is not None:
+            params["month"] = month
+        if year is not None:
+            params["year"] = year
+        r = await self.client.get("/expense/budget", params=params)
+        r.raise_for_status()
+        return r.json()
+
     # ── Schedule / Google Sheet API ───────────────────────────
 
     async def set_sheet(self, telegram_id: int, sheet_url: str) -> dict:
@@ -112,13 +214,31 @@ class ApiClient:
         response.raise_for_status()
         return response.json()
 
-    async def get_daily_schedule(self, telegram_id: int, day: int | None = None) -> list[dict]:
+    async def get_notification_settings(self, telegram_id: int) -> dict:
+        """Lấy cài đặt thông báo của user."""
+        r = await self.client.get(f"/users/{telegram_id}/notifications")
+        r.raise_for_status()
+        return r.json()
+
+    async def update_notification_settings(self, telegram_id: int, data: dict) -> dict:
+        """Cập nhật cài đặt thông báo (chỉ fields có trong data)."""
+        r = await self.client.patch(f"/users/{telegram_id}/notifications", json=data)
+        r.raise_for_status()
+        return r.json()
+
+    async def get_all_users_with_notifications(self) -> list[dict]:
+        """Lấy danh sách tất cả user cùng notification settings (dùng cho scheduler)."""
+        r = await self.client.get("/users/all-with-notifications")
+        r.raise_for_status()
+        return r.json()
+
+    async def get_daily_schedule(self, telegram_id: int, day_of_week: int) -> list[dict]:
         """
         Lấy lịch sinh hoạt hôm nay (kết hợp mọi-ngày + ngày đó).
         GET /api/schedule/{telegramId}/daily?day={day}
         Returns: list of { startTime, endTime, activity, category, note, dayOfWeek }
         """
-        params = {"day": day} if day is not None else {}
+        params = {"day": day_of_week}
         response = await self.client.get(f"/schedule/{telegram_id}/daily", params=params)
         response.raise_for_status()
         return response.json()
@@ -131,6 +251,159 @@ class ApiClient:
         response = await self.client.get(f"/schedule/{telegram_id}/daily/all")
         response.raise_for_status()
         return response.json()
+
+    # ── Expense / Chi tiêu API ────────────────────────────────
+
+    async def add_expense(self, telegram_id: int, type_: str, amount: int,
+                          category_name: str, note: str | None = None) -> dict:
+        """Thêm giao dịch chi tiêu / thu nhập nhập tay."""
+        r = await self.client.post("/expense/add", json={
+            "telegramId":  telegram_id,
+            "type":        type_,
+            "amount":      amount,
+            "categoryName": category_name,
+            "note":        note,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def confirm_scan(self, telegram_id: int, amount: int, category_name: str,
+                           note: str | None, image_file_id: str | None,
+                           ai_confidence: float | None) -> dict:
+        """Lưu giao dịch sau khi user xác nhận kết quả AI scan."""
+        r = await self.client.post("/expense/confirm-scan", json={
+            "telegramId":   telegram_id,
+            "type":         "EXPENSE",
+            "amount":       amount,
+            "categoryName": category_name,
+            "note":         note,
+            "imageFileId":  image_file_id,
+            "aiConfidence": ai_confidence,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def get_expense_report(self, telegram_id: int,
+                                 month: int | None = None, year: int | None = None) -> dict:
+        """Lấy báo cáo chi tiêu tháng."""
+        params = {"telegramId": telegram_id}
+        if month: params["month"] = month
+        if year:  params["year"]  = year
+        r = await self.client.get("/expense/report", params=params)
+        r.raise_for_status()
+        return r.json()
+
+    async def get_expense_history(self, telegram_id: int, period: str = "month",
+                                  limit: int = 10) -> list[dict]:
+        """Lấy lịch sử giao dịch."""
+        r = await self.client.get("/expense/history", params={
+            "telegramId": telegram_id, "period": period, "limit": limit
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def set_groq_key(self, telegram_id: int, api_key: str | None) -> str:
+        """Cài / xóa Groq API Key riêng của user."""
+        r = await self.client.post("/expense/setkey", json={
+            "telegramId": telegram_id,
+            "apiKey":     api_key,
+        })
+        r.raise_for_status()
+        return r.json()["message"]
+
+    async def get_key_status(self, telegram_id: int) -> dict:
+        """Xem trạng thái quota AI của user."""
+        r = await self.client.get("/expense/keystatus", params={"telegramId": telegram_id})
+        r.raise_for_status()
+        return r.json()
+
+    # ── Deadline API ──────────────────────────────────────────
+
+    async def get_deadlines(self, telegram_id: int) -> list[dict]:
+        """Lấy danh sách deadline sắp tới (chưa done, sắp xếp theo ngày)."""
+        r = await self.client.get(f"/deadlines/{telegram_id}")
+        r.raise_for_status()
+        return r.json()
+
+    async def add_deadline(self, telegram_id: int, title: str,
+                           due_date: str, subject: str | None = None) -> dict:
+        """Thêm deadline mới."""
+        r = await self.client.post("/deadlines", json={
+            "telegramId": telegram_id,
+            "title":      title,
+            "dueDate":    due_date,
+            "subject":    subject,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def done_deadline(self, telegram_id: int, deadline_id: int) -> dict:
+        """Đánh dấu deadline đã hoàn thành."""
+        r = await self.client.patch(f"/deadlines/{deadline_id}/done",
+                                    params={"telegramId": telegram_id})
+        r.raise_for_status()
+        return r.json()
+
+    # ── Exam API ──────────────────────────────────────────────
+
+    async def get_exams(self, telegram_id: int) -> list[dict]:
+        """Lấy danh sách lịch thi (sắp xếp theo ngày thi)."""
+        r = await self.client.get(f"/exams/{telegram_id}")
+        r.raise_for_status()
+        return r.json()
+
+    async def add_exam(self, telegram_id: int, subject: str, exam_date: str,
+                       start_time: str, room: str | None = None,
+                       exam_type: str | None = None) -> dict:
+        """Thêm lịch thi mới."""
+        r = await self.client.post("/exams", json={
+            "telegramId":  telegram_id,
+            "subject":     subject,
+            "examDate":    exam_date,
+            "startTime":   start_time,
+            "room":        room,
+            "examType":    exam_type,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    # ── Vocabulary / Quiz API ─────────────────────────────────
+
+    async def get_next_quiz_word(self, telegram_id: int) -> dict | None:
+        """Lấy từ tiếp theo cần ôn (spaced repetition — nextReviewAt gần nhất)."""
+        r = await self.client.get(f"/vocabulary/{telegram_id}/next")
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    async def add_word(self, telegram_id: int, word: str, meaning: str,
+                       example: str | None = None) -> dict:
+        """Thêm từ vựng mới."""
+        r = await self.client.post("/vocabulary", json={
+            "telegramId": telegram_id,
+            "word":       word,
+            "meaning":    meaning,
+            "example":    example,
+        })
+        r.raise_for_status()
+        return r.json()
+
+    async def get_all_words(self, telegram_id: int) -> list[dict]:
+        """Lấy toàn bộ từ vựng của user."""
+        r = await self.client.get(f"/vocabulary/{telegram_id}")
+        r.raise_for_status()
+        return r.json()
+
+    async def submit_quiz_result(self, telegram_id: int,
+                                 word_id: int, correct: bool) -> dict:
+        """Cập nhật kết quả quiz — tăng/giảm level spaced repetition."""
+        r = await self.client.post(f"/vocabulary/{word_id}/review", json={
+            "telegramId": telegram_id,
+            "correct":    correct,
+        })
+        r.raise_for_status()
+        return r.json()
 
     async def close(self):
         """Đóng HTTP client khi shutdown."""

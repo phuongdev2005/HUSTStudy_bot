@@ -4,8 +4,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 /**
  * DTO trả về thông tin user cho Python Bot.
  *
@@ -24,14 +22,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class UserResponse {
 
-    private Long id;
-    private Long telegramId;
-    private String username;
-    private String fullName;
-    private String languageCode;
-    private String timezone;
+    private Long    id;
+    private Long    telegramId;
+    private String  username;
+    private String  fullName;
+    private String  languageCode;
+    private String  timezone;
     private Boolean isActive;
-    private LocalDateTime createdAt;
+    private String  createdAt;   // ISO string — tránh Jackson LocalDateTime issue
 
     /**
      * Static factory — tạo UserResponse từ User entity.
@@ -45,7 +43,8 @@ public class UserResponse {
         res.setLanguageCode(user.getLanguageCode());
         res.setTimezone(user.getTimezone());
         res.setIsActive(user.getIsActive());
-        res.setCreatedAt(user.getCreatedAt());
+        res.setCreatedAt(user.getCreatedAt() != null
+                ? user.getCreatedAt().toString() : null);
         return res;
     }
 }

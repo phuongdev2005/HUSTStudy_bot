@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -15,24 +16,34 @@ import java.util.List;
 public interface DailyActivityRepository extends JpaRepository<DailyActivity, Long> {
 
     /**
-     * Lấy lịch của 1 ngày cụ thể:
-     *   - Hoạt động mọi ngày (day_of_week IS NULL)  ← ăn, ngủ, vệ sinh
-     *   - Hoạt động riêng ngày đó (day_of_week = ?) ← lịch học hôm nay
-     * Sắp xếp theo giờ bắt đầu.
+     * Lấy lịch sinh hoạt theo ngày cụ thể.
      */
     @Query("""
             SELECT a FROM DailyActivity a
             WHERE a.user.id = :userId
+              AND a.date = :date
+            ORDER BY a.startTime, a.sortOrder
+            """)
+    List<DailyActivity> findByUserIdAndDate(
+            @Param("userId") Long userId,
+            @Param("date") LocalDate date);
+
+    /**
+     * Lấy lịch sinh hoạt hàng tuần lặp lại theo thứ.
+     */
+    @Query("""
+            SELECT a FROM DailyActivity a
+            WHERE a.user.id = :userId
+              AND a.date IS NULL
               AND (a.dayOfWeek IS NULL OR a.dayOfWeek = :dayOfWeek)
             ORDER BY a.startTime, a.sortOrder
             """)
-    List<DailyActivity> findDayActivities(
+    List<DailyActivity> findByUserIdAndDayOfWeekAndDateIsNull(
             @Param("userId") Long userId,
             @Param("dayOfWeek") Integer dayOfWeek);
 
     /**
-     * Lấy toàn bộ lịch của user (tất cả các ngày).
-     * Dùng cho /timetable — xem lịch cả tuần.
+     * Lấy toàn bộ lịch sinh hoạt của user.
      */
     @Query("""
             SELECT a FROM DailyActivity a

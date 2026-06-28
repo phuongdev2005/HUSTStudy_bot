@@ -27,7 +27,7 @@ public class Exam {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "subject", nullable = false, length = 200)
+    @Column(name = "subject_name", nullable = false, length = 200)
     private String subject;           // Tên môn thi
 
     @Column(name = "exam_date", nullable = false)
@@ -36,7 +36,7 @@ public class Exam {
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;      // Giờ bắt đầu (vd: 07:00)
 
-    @Column(name = "duration_minutes")
+    @Column(name = "duration_min")
     private Integer durationMinutes;  // Thời gian làm bài (phút)
 
     @Column(name = "room", length = 50)

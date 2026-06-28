@@ -1,73 +1,77 @@
 package com.studybot.sheets;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.SheetsScopes;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.GoogleCredentials;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ResourceLoader;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.GeneralSecurityException;
-import java.util.List;
 
 /**
- * Cấu hình Google Sheets API client dùng Service Account.
+ * Cấu hình Google Sheets API client dùng API Key.
  *
  * Yêu cầu:
- *   - File google-credentials.json đặt trong src/main/resources/
- *   - Service Account cần có quyền đọc sheet (user share sheet với email SA)
- *   - Hoặc sheet set "Anyone with link can view" → SA đọc được không cần share
+ *   - Biến môi trường GOOGLE_API_KEY chứa Google Sheets API Key
+ *   - Sheet phải được set "Anyone with the link can view" (Public)
+ *   - Bật Google Sheets API tại Google Cloud Console
+ *
+ * Cách tạo API Key:
+ *   1. Vào https://console.cloud.google.com/
+ *   2. APIs & Services → Library → "Google Sheets API" → Enable
+ *   3. APIs & Services → Credentials → Create Credentials → API Key
+ *   4. (Tùy chọn) Restrict key: chỉ cho Google Sheets API
  */
 @Configuration
 @Slf4j
 public class SheetsConfig {
 
-    @Value("${google.sheets.credentials-path:classpath:google-credentials.json}")
-    private String credentialsPath;
+    @Value("${google.sheets.api-key:}")
+    private String apiKey;
 
     @Value("${google.sheets.application-name:HUSTStudy Bot}")
     private String applicationName;
 
-    private final ResourceLoader resourceLoader;
-
-    public SheetsConfig(ResourceLoader resourceLoader) {
-        this.resourceLoader = resourceLoader;
-    }
-
     /**
-     * Tạo Sheets API client được authenticate bằng Service Account.
+     * Tạo Sheets API client được authenticate bằng API Key.
      * Bean này được inject vào SheetsService dưới tên "sheetsClient".
+     *
+     * Nếu chưa có API Key → log warning và trả null.
+     * SheetsService sẽ trả lỗi thân thiện khi được gọi.
      */
     @Bean(name = "sheetsClient")
     public Sheets sheetsClient() throws IOException, GeneralSecurityException {
-        try {
-            InputStream credStream = resourceLoader
-                    .getResource(credentialsPath)
-                    .getInputStream();
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("⚠️  GOOGLE_API_KEY chưa được cấu hình – Google Sheets API sẽ không khả dụng. " +
+                     "Thêm GOOGLE_API_KEY vào file .env để bật tính năng này.");
+            return null;
+        }
 
-            GoogleCredentials credentials = GoogleCredentials
-                    .fromStream(credStream)
-                    .createScoped(List.of(SheetsScopes.SPREADSHEETS_READONLY));
+        try {
+            // API Key được truyền như một query parameter tự động
+            // bằng cách gọi .setKey(apiKey) trên request thông qua HttpRequestInitializer
+            HttpRequestInitializer requestInitializer = new HttpRequestInitializer() {
+                @Override
+                public void initialize(HttpRequest request) throws IOException {
+                    // Không cần OAuth – API Key được xử lý bởi Sheets.Builder.setGoogleClientRequestInitializer
+                }
+            };
 
             return new Sheets.Builder(
                     GoogleNetHttpTransport.newTrustedTransport(),
                     GsonFactory.getDefaultInstance(),
-                    new HttpCredentialsAdapter(credentials))
+                    requestInitializer)
                     .setApplicationName(applicationName)
+                    .setGoogleClientRequestInitializer(request -> request.put("key", apiKey))
                     .build();
 
         } catch (Exception e) {
-            // Nếu chưa có credentials file → log warning nhưng không crash app
-            // SheetsService sẽ trả lỗi khi được gọi
-            log.warn("⚠️  Không tìm thấy google-credentials.json – Google Sheets API sẽ không khả dụng. " +
-                     "Đặt file credentials vào src/main/resources/ để bật tính năng này.");
+            log.error("❌ Lỗi khởi tạo Google Sheets client: {}", e.getMessage(), e);
             return null;
         }
     }

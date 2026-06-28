@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -119,7 +120,6 @@ public class SheetsService {
      */
     @Transactional
     public SyncResult syncScheduleFromSheet(Long telegramId) {
-        // Kiểm tra Sheets API có khả dụng không
         if (sheetsClient == null) {
             return SyncResult.error("Google Sheets API chưa được cấu hình trên server.");
         }
@@ -140,51 +140,48 @@ public class SheetsService {
         }
 
         try {
-            // Đọc dữ liệu từ Google Sheets API
+            // Đọc toàn bộ dữ liệu (kể cả header row)
             ValueRange response = sheetsClient.spreadsheets().values()
-                    .get(spreadsheetId, DATA_RANGE)
+                    .get(spreadsheetId, "A1:ZZ")
                     .execute();
 
             List<List<Object>> rows = response.getValues();
             if (rows == null || rows.isEmpty()) {
-                return SyncResult.error(
-                    "Sheet trống hoặc chưa có dữ liệu từ hàng 2 trở đi.\n" +
-                    "Kiểm tra lại format: hàng 1 = header, từ hàng 2 = dữ liệu.");
+                return SyncResult.error("Sheet trống hoặc chưa có dữ liệu.");
             }
 
-            // Xóa toàn bộ môn học cũ của user (cascade → xóa cả class_schedules)
+            // Auto-detect format dựa vào header row
+            List<Object> header = rows.get(0);
+            boolean isGridFormat = isGridFormat(header);
+
+            log.info("User {} – detect format: {}", telegramId, isGridFormat ? "GRID (T2-CN cols)" : "ROW (mỗi hàng 1 môn)");
+
             subjectRepository.deleteAllByUser(user);
             subjectRepository.flush();
 
-            // Parse và lưu dữ liệu mới
             List<String> errors = new ArrayList<>();
-            int successCount = 0;
+            int successCount;
 
-            for (int i = 0; i < rows.size(); i++) {
-                List<Object> row = rows.get(i);
-                int rowNum = i + 2; // Hàng thực tế trong sheet (1-indexed, bỏ header)
-
-                try {
-                    parseAndSaveRow(row, user, rowNum);
-                    successCount++;
-                } catch (Exception e) {
-                    errors.add("Hàng " + rowNum + ": " + e.getMessage());
-                    log.warn("Lỗi parse hàng {} của user {}: {}", rowNum, telegramId, e.getMessage());
-                }
+            if (isGridFormat) {
+                // Format mới: hàng = ca học, cột = thứ T2..CN
+                successCount = parseGridSheet(rows, user, errors);
+            } else {
+                // Format cũ: mỗi hàng = 1 buổi học
+                successCount = parseRowSheet(rows, user, errors);
             }
 
-            // Cập nhật thời gian sync
             settings.setSheetSyncedAt(LocalDateTime.now());
             userSettingsRepository.save(settings);
 
             log.info("✅ Sync sheet xong cho user {} – {} buổi học, {} lỗi",
                      telegramId, successCount, errors.size());
-
             return SyncResult.success(successCount, errors);
 
+        } catch (IllegalArgumentException e) {
+            log.warn("Lỗi cấu hình dữ liệu khi sync sheet của user {}: {}", telegramId, e.getMessage());
+            return SyncResult.error("❌ " + e.getMessage());
         } catch (IOException e) {
             log.error("Lỗi đọc Google Sheet {} của user {}: {}", spreadsheetId, telegramId, e.getMessage());
-
             if (e.getMessage() != null && e.getMessage().contains("403")) {
                 return SyncResult.error(
                     "❌ Không có quyền đọc sheet!\n\n" +
@@ -198,31 +195,224 @@ public class SheetsService {
         }
     }
 
+    private record HeaderInfo(Integer dayOfWeek, LocalDate date) {}
+
+    private HeaderInfo parseHeader(String headerVal) {
+        if (headerVal == null || headerVal.isBlank()) return null;
+        String s = headerVal.trim().toLowerCase();
+
+        // 1. Kiểm tra định dạng ngày: d/M/yyyy hoặc d/M/yy (hoặc gạch ngang)
+        if (s.matches("\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{2,4}")) {
+            try {
+                String normalized = s.replace("-", "/");
+                java.time.format.DateTimeFormatter formatter =
+                    new java.time.format.DateTimeFormatterBuilder()
+                        .appendPattern("[d/M/yyyy]")
+                        .appendPattern("[dd/MM/yyyy]")
+                        .appendPattern("[d/M/yy]")
+                        .appendPattern("[dd/MM/yy]")
+                        .toFormatter();
+                LocalDate date = LocalDate.parse(normalized, formatter);
+                int dow = date.getDayOfWeek().getValue(); // 1 = Mon ... 7 = Sun
+                return new HeaderInfo(dow, date);
+            } catch (Exception e) {
+                log.warn("Lỗi parse date từ header: {} | {}", headerVal, e.getMessage());
+            }
+        }
+
+        // 2. Định dạng thứ thông thường
+        String cleaned = s.replace("thứ", "").replace("thu", "").replace(" ", "");
+        Integer dow = switch (cleaned) {
+            case "2", "t2", "hai", "monday", "mon" -> 1;
+            case "3", "t3", "ba", "tuesday", "tue" -> 2;
+            case "4", "t4", "tu", "wednesday", "wed" -> 3;
+            case "5", "t5", "nam", "thursday", "thu" -> 4;
+            case "6", "t6", "sau", "friday", "fri" -> 5;
+            case "7", "t7", "bay", "saturday", "sat" -> 6;
+            case "8", "cn", "chủnhật", "chunhat", "sunday", "sun" -> 7;
+            default -> null;
+        };
+
+        if (dow != null) {
+            return new HeaderInfo(dow, null);
+        }
+        return null;
+    }
+
+    /**
+     * Nhận diện format sheet dựa vào header row.
+     * Grid format: header[1] chứa "T2", "Thứ 2", "2" (ngày trong tuần) hoặc ngày cụ thể.
+     */
+    private boolean isGridFormat(List<Object> header) {
+        if (header == null || header.size() < 2) return false;
+        String col1 = header.get(1).toString();
+        return parseHeader(col1) != null;
+    }
+
+    /**
+     * Parse format LƯỚI (grid):
+     *   Hàng 1 (header): Ca học | Thứ 2 | Thứ 3 | Thứ 4 | Thứ 5 | Thứ 6 | Thứ 7 | CN (hoặc ngày tháng)
+     *   Hàng 2+:         07:00-09:30 | Tên môn|Mã|Phòng|GV | ...  (mỗi ô = 1 môn hoặc trống)
+     *
+     * Mỗi ô cell format: "Tên môn|Mã môn|Phòng|Giảng viên"  (| là dấu phân cách)
+     * Ô trống = không có môn vào ca đó.
+     */
+    private int parseGridSheet(List<List<Object>> rows, User user, List<String> errors) {
+        List<Object> header = rows.get(0);
+        HeaderInfo[] colInfos = new HeaderInfo[header.size()];
+        java.util.Set<LocalDate> dateSet = new java.util.HashSet<>();
+        for (int col = 1; col < header.size(); col++) {
+            HeaderInfo info = parseHeader(getString(header, col));
+            if (info != null) {
+                if (info.date() != null) {
+                    if (dateSet.contains(info.date())) {
+                        throw new IllegalArgumentException("Trùng lặp ngày " + getString(header, col) + " ở các cột khác nhau. Vui lòng kiểm tra lại sheet!");
+                    }
+                    dateSet.add(info.date());
+                }
+                colInfos[col] = info;
+            }
+        }
+        int successCount = 0;
+
+        for (int i = 1; i < rows.size(); i++) {          // bỏ header row
+            List<Object> row = rows.get(i);
+            if (row == null || row.isEmpty()) continue;
+
+            String timeSlot = getString(row, 0).trim();  // VD: "07:00-09:30"
+            if (timeSlot.isBlank()) continue;
+
+            // Parse giờ từ time slot
+            String startTime, endTime;
+            try {
+                String[] times = timeSlot.split("[-–]");  // hỗ trợ cả "-" và "–"
+                startTime = times[0].trim();
+                endTime   = times[1].trim();
+            } catch (Exception e) {
+                errors.add("Hàng " + (i + 1) + ": Ca học '" + timeSlot + "' không đúng định dạng HH:mm-HH:mm");
+                continue;
+            }
+
+            // Duyệt các cột ngày (col 1 = T2, col 7 = CN hoặc map theo ngày)
+            for (int col = 1; col < header.size() && col < row.size(); col++) {
+                HeaderInfo info = colInfos[col];
+                if (info == null) continue;
+
+                String cell = getString(row, col).trim();
+                if (cell.isBlank()) continue;
+
+                try {
+                    parseCellAndSave(cell, startTime, endTime, info.dayOfWeek(), info.date(), user);
+                    successCount++;
+                } catch (Exception e) {
+                    errors.add("Hàng " + (i + 1) + " cột " + getString(header, col) + ": " + e.getMessage());
+                    log.warn("Grid parse error row={} col={}: {}", i + 1, col, e.getMessage());
+                }
+            }
+        }
+        return successCount;
+    }
+
+    /**
+     * Parse nội dung 1 ô trong grid format:
+     * "Tên môn|Mã môn|Phòng|Giảng viên"
+     * Chỉ tên môn là bắt buộc; các trường còn lại tùy chọn.
+     */
+    private void parseCellAndSave(String cell, String startTime, String endTime,
+                                   int dayOfWeek, LocalDate date, User user) {
+        String[] parts = cell.split("\\|");
+        String name    = parts.length > 0 ? parts[0].trim() : "";
+        String code    = parts.length > 1 ? parts[1].trim() : null;
+        String room    = parts.length > 2 ? parts[2].trim() : null;
+        String teacher = parts.length > 3 ? parts[3].trim() : null;
+
+        if (name.isBlank()) throw new IllegalArgumentException("Tên môn không được để trống");
+
+        Subject subject = Subject.builder()
+                .user(user)
+                .name(name)
+                .code(code != null && !code.isBlank() ? code : null)
+                .teacher(teacher != null && !teacher.isBlank() ? teacher : null)
+                .isActive(true)
+                .build();
+        subject = subjectRepository.save(subject);
+
+        ClassSession session = ClassSession.builder()
+                .subject(subject)
+                .dayOfWeek(dayOfWeek)
+                .startTime(startTime)
+                .endTime(endTime)
+                .room(room != null && !room.isBlank() ? room : null)
+                .weekType("ALL")
+                .date(date)
+                .build();
+        classScheduleRepository.save(session);
+    }
+
+    /**
+     * Parse format CŨ: mỗi hàng = 1 buổi học
+     * [Tên môn, Mã môn, Thứ, Giờ bắt đầu, Giờ kết thúc, Phòng, Giảng viên]
+     * (hàng 1 là header → bỏ qua, data từ hàng 2)
+     */
+    private int parseRowSheet(List<List<Object>> rows, User user, List<String> errors) {
+        int successCount = 0;
+        // rows[0] là header → bắt đầu từ index 1
+        for (int i = 1; i < rows.size(); i++) {
+            try {
+                parseAndSaveRow(rows.get(i), user, i + 1);
+                successCount++;
+            } catch (Exception e) {
+                errors.add("Hàng " + (i + 1) + ": " + e.getMessage());
+                log.warn("Row parse error row={}: {}", i + 1, e.getMessage());
+            }
+        }
+        return successCount;
+    }
+
+
+
     // ═══════════════════════════════════════════════════════════
     //  3. Lấy lịch học (để bot hiển thị)
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Lấy lịch học hôm nay của user từ DB.
-     * dayOfWeek: 1=T2, 2=T3, 3=T4, 4=T5, 5=T6, 6=T7, 7=CN
+     * Lấy lịch học hôm nay của user từ DB (ưu tiên lịch theo ngày cụ thể, fallback lịch tuần mặc định).
      */
     public List<ScheduleItem> getTodaySchedule(Long telegramId) {
         User user = getUserByTelegramId(telegramId);
-        // Tính dayOfWeek theo convention của DB (1=T2 … 7=CN)
-        int javaDow = java.time.LocalDate.now().getDayOfWeek().getValue(); // 1=Mon … 7=Sun
+        LocalDate today = LocalDate.now();
+        int javaDow = today.getDayOfWeek().getValue();
+
         List<ClassSession> sessions = classScheduleRepository
-                .findTodayByUserId(user.getId(), javaDow);
+                .findByUserIdAndDate(user.getId(), today);
+        if (sessions.isEmpty()) {
+            sessions = classScheduleRepository
+                    .findByUserIdAndDayOfWeekAndDateIsNull(user.getId(), javaDow);
+        }
         return sessions.stream().map(ScheduleItem::from).toList();
     }
 
     /**
-     * Lấy toàn bộ lịch học trong tuần của user từ DB.
+     * Lấy toàn bộ lịch học trong tuần của user từ DB (gộp lịch ngày cụ thể tuần này + lịch tuần mặc định).
      */
     public List<ScheduleItem> getWeeklySchedule(Long telegramId) {
         User user = getUserByTelegramId(telegramId);
-        List<ClassSession> sessions = classScheduleRepository
-                .findWeeklyByUserId(user.getId());
-        return sessions.stream().map(ScheduleItem::from).toList();
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(java.time.DayOfWeek.MONDAY);
+
+        List<ClassSession> weeklySessions = new java.util.ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = monday.plusDays(i);
+            int dow = i + 1;
+            List<ClassSession> sessions = classScheduleRepository
+                    .findByUserIdAndDate(user.getId(), date);
+            if (sessions.isEmpty()) {
+                sessions = classScheduleRepository
+                        .findByUserIdAndDayOfWeekAndDateIsNull(user.getId(), dow);
+            }
+            weeklySessions.addAll(sessions);
+        }
+        return weeklySessions.stream().map(ScheduleItem::from).toList();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -355,51 +545,58 @@ public class SheetsService {
         }
 
         try {
+            // Đọc cả header để detect format
             ValueRange response = sheetsClient.spreadsheets().values()
-                    .get(spreadsheetId, "A2:F")
+                    .get(spreadsheetId, "A1:ZZ")
                     .execute();
 
             List<List<Object>> rows = response.getValues();
             if (rows == null || rows.isEmpty()) {
-                return SyncResult.error(
-                    "Sheet trống hoặc chưa có dữ liệu từ hàng 2.\n" +
-                    "Format: Thứ | Giờ bắt | Giờ kết | Hoạt động | Danh mục | Ghi chú");
+                return SyncResult.error("Sheet trống hoặc chưa có dữ liệu.");
             }
 
-            // Xóa toàn bộ lịch cũ của user
+            // Auto-detect format
+            List<Object> header = rows.get(0);
+            boolean isGrid = isDailyGridFormat(header);
+            log.info("User {} daily sync – format: {}", telegramId,
+                     isGrid ? "GRID (Thời gian | T2..CN)" : "ROW (Thứ|Giờ|Hoạt động)");
+
+            // Xóa lịch cũ
             dailyActivityRepository.deleteAllByUser(user);
             dailyActivityRepository.flush();
 
             List<String> errors = new ArrayList<>();
-            int successCount = 0;
+            int successCount;
 
-            for (int i = 0; i < rows.size(); i++) {
-                List<Object> row = rows.get(i);
-                int rowNum = i + 2;
-
-                // Skip dòng rỗng và dòng comment bắt đầu bằng #
-                if (row.isEmpty()) continue;
-                String firstCell = row.get(0) != null ? row.get(0).toString().trim() : "";
-                if (firstCell.startsWith("#") || firstCell.isBlank()) continue;
-
-                try {
-                    parseDailyRow(row, user, i);
-                    successCount++;
-                } catch (Exception e) {
-                    errors.add("Hàng " + rowNum + ": " + e.getMessage());
-                    log.warn("Lỗi parse hàng {} daily của user {}: {}", rowNum, telegramId, e.getMessage());
+            if (isGrid) {
+                successCount = parseDailyGridSheet(rows, user, errors);
+            } else {
+                // Format cũ: từ hàng 2 (bỏ header)
+                successCount = 0;
+                for (int i = 1; i < rows.size(); i++) {
+                    List<Object> row = rows.get(i);
+                    if (row.isEmpty()) continue;
+                    String first = row.get(0) != null ? row.get(0).toString().trim() : "";
+                    if (first.startsWith("#") || first.isBlank()) continue;
+                    try {
+                        parseDailyRow(row, user, i);
+                        successCount++;
+                    } catch (Exception e) {
+                        errors.add("Hàng " + (i + 1) + ": " + e.getMessage());
+                        log.warn("Lỗi parse hàng {} daily: {}", i + 1, e.getMessage());
+                    }
                 }
             }
 
-
             settings.setSheetSyncedAt(LocalDateTime.now());
             userSettingsRepository.save(settings);
-
             log.info("✅ Sync daily schedule xong user {} – {} hoạt động, {} lỗi",
                      telegramId, successCount, errors.size());
-
             return SyncResult.success(successCount, errors);
 
+        } catch (IllegalArgumentException e) {
+            log.warn("Lỗi cấu hình dữ liệu khi sync daily sheet của user {}: {}", telegramId, e.getMessage());
+            return SyncResult.error("❌ " + e.getMessage());
         } catch (java.io.IOException e) {
             log.error("Lỗi đọc Google Sheet {} của user {}: {}", spreadsheetId, telegramId, e.getMessage());
             if (e.getMessage() != null && e.getMessage().contains("403")) {
@@ -412,16 +609,177 @@ public class SheetsService {
     }
 
     /**
-     * Lấy lịch sinh hoạt của 1 ngày cụ thể (kết hợp "Tất cả" + ngày đó).
-     * dayOfWeek: 1=T2 … 7=CN (theo Java DayOfWeek.getValue())
+     * Nhận diện format lịch sinh hoạt dạng lưới.
+     * Header[0] = "Thời gian" / "Giờ" / "Ca"
+     * Header[1] = "Thứ 2" / "T2" / "2" hoặc ngày dd/MM/yyyy
      */
-    public List<DailyActivityItem> getDailyActivities(Long telegramId, Integer dayOfWeek) {
+    private boolean isDailyGridFormat(List<Object> header) {
+        if (header == null || header.size() < 2) return false;
+        String col0 = header.get(0).toString().trim().toLowerCase();
+        boolean col0ok = col0.contains("thời gian") || col0.contains("giờ") || col0.contains("ca");
+        boolean col1ok = parseHeader(header.get(1).toString()) != null;
+        return col0ok && col1ok;
+    }
+
+    /**
+     * Parse lịch sinh hoạt format lưới (GRID):
+     *   Hàng 1 (header): Thời gian | Thứ 2 | Thứ 3 | Thứ 4 | Thứ 5 | Thứ 6 | Thứ 7 | CN (hoặc ngày tháng)
+     *   Hàng 2+:         07:00-09:30 | Giải tích 1 | ... | (trống nếu không có HĐ)
+     *
+     * Quy tắc:
+     *  - Mỗi ô = tên hoạt động (free-text), trống = không có gì
+     *  - Cột map theo thứ hoặc ngày
+     *  - Nếu tất cả các ô trong 1 hàng giống nhau → lưu 1 record dayOfWeek=null (mọi ngày)
+     */
+    private int parseDailyGridSheet(List<List<Object>> rows, User user, List<String> errors) {
+        List<Object> header = rows.get(0);
+        HeaderInfo[] colInfos = new HeaderInfo[header.size()];
+        java.util.Set<LocalDate> dateSet = new java.util.HashSet<>();
+        for (int col = 1; col < header.size(); col++) {
+            HeaderInfo info = parseHeader(getString(header, col));
+            if (info != null) {
+                if (info.date() != null) {
+                    if (dateSet.contains(info.date())) {
+                        throw new IllegalArgumentException("Trùng lặp ngày " + getString(header, col) + " ở các cột khác nhau. Vui lòng kiểm tra lại sheet!");
+                    }
+                    dateSet.add(info.date());
+                }
+                colInfos[col] = info;
+            }
+        }
+
+        int successCount = 0;
+        int sortOrder    = 0;
+
+        for (int i = 1; i < rows.size(); i++) {   // bỏ header
+            List<Object> row = rows.get(i);
+            if (row == null || row.isEmpty()) continue;
+
+            String timeSlot = getString(row, 0).trim();
+            if (timeSlot.isBlank()) continue;
+
+            // Parse giờ: "07:00-09:30" hoặc "07:00–09:30"
+            String startTime, endTime;
+            try {
+                String[] t = timeSlot.split("[-–]", 2);
+                startTime = t[0].trim();
+                endTime   = t[1].trim();
+            } catch (Exception ex) {
+                errors.add("Hàng " + (i + 1) + ": Giờ '" + timeSlot + "' không đúng định dạng HH:mm-HH:mm");
+                continue;
+            }
+
+            // Thu thập hoạt động cho từng ngày trong tuần
+            String[] activities = new String[7]; // index 0=T2, 6=CN
+            java.util.Arrays.fill(activities, "");
+            for (int col = 1; col < header.size() && col < row.size(); col++) {
+                HeaderInfo info = colInfos[col];
+                if (info == null) continue;
+                String cell = getString(row, col).trim();
+                if (cell.isBlank()) continue;
+
+                if (info.date() != null) {
+                    // Nếu là ngày cụ thể → lưu luôn hoạt động riêng ngày đó
+                    try {
+                        saveDailyActivity(user, info.dayOfWeek(), info.date(), startTime, endTime, cell, sortOrder++);
+                        successCount++;
+                    } catch (Exception ex) {
+                        errors.add("Hàng " + (i + 1) + " ngày " + getString(header, col) + ": " + ex.getMessage());
+                    }
+                } else {
+                    // Nếu là thứ thông thường -> gán vào activities mảng để kiểm tra allSame
+                    activities[info.dayOfWeek() - 1] = cell;
+                }
+            }
+
+            // Lưu riêng các thứ lặp lại hàng tuần (nếu có gom cụm)
+            boolean hasWeeklyActivities = false;
+            for (String act : activities) {
+                if (!act.isBlank()) { hasWeeklyActivities = true; break; }
+            }
+            if (hasWeeklyActivities) {
+                boolean allSame = true;
+                String firstNonEmpty = null;
+                for (String act : activities) {
+                    if (!act.isBlank()) {
+                        if (firstNonEmpty == null) firstNonEmpty = act;
+                        else if (!act.equals(firstNonEmpty)) { allSame = false; break; }
+                    } else {
+                        allSame = false; break;
+                    }
+                }
+
+                if (allSame && firstNonEmpty != null) {
+                    try {
+                        saveDailyActivity(user, null, null, startTime, endTime, firstNonEmpty, sortOrder++);
+                        successCount++;
+                    } catch (Exception ex) {
+                        errors.add("Hàng " + (i + 1) + ": " + ex.getMessage());
+                    }
+                } else {
+                    for (int d = 0; d < 7; d++) {
+                        if (activities[d].isBlank()) continue;
+                        try {
+                            saveDailyActivity(user, d + 1, null, startTime, endTime, activities[d], sortOrder++);
+                            successCount++;
+                        } catch (Exception ex) {
+                            errors.add("Hàng " + (i + 1) + " T" + (d + 2) + ": " + ex.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+        return successCount;
+    }
+
+    /** Lưu 1 DailyActivity vào DB. dayOfWeek=null nghĩa là mọi ngày. */
+    private void saveDailyActivity(User user, Integer dayOfWeek, LocalDate date,
+                                    String startTime, String endTime,
+                                    String activity, int sortOrder) {
+        // Phân loại category tự động từ tên hoạt động
+        String cat = autoCategory(activity);
+        DailyActivity da = DailyActivity.builder()
+                .user(user)
+                .dayOfWeek(dayOfWeek)
+                .date(date)
+                .startTime(startTime)
+                .endTime(endTime)
+                .activity(activity)
+                .category(cat)
+                .note(null)
+                .sortOrder(sortOrder)
+                .build();
+        dailyActivityRepository.save(da);
+    }
+
+    /** Phân loại tự động dựa vào tên hoạt động. */
+    private String autoCategory(String activity) {
+        String a = activity.toLowerCase();
+        if (a.contains("ngủ"))                                          return "Nghỉ ngơi";
+        if (a.contains("ăn") || a.contains("bữa"))                     return "Sinh hoạt";
+        if (a.contains("vệ sinh") || a.contains("tắm"))                 return "Sinh hoạt";
+        if (a.contains("thể dục") || a.contains("thể thao")
+                || a.contains("tập"))                                   return "Sức khỏe";
+        if (a.contains("học") || a.contains("tự học")
+                || a.contains("bài tập") || a.contains("ôn"))          return "Học tập";
+        if (a.contains("giải trí") || a.contains("nghỉ"))              return "Giải trí";
+        return "Khác";
+    }
+
+    /**
+     * Lấy lịch sinh hoạt của 1 ngày cụ thể (kết hợp "Tất cả" + ngày đó).
+     */
+    public List<DailyActivityItem> getDailyActivities(Long telegramId, LocalDate date) {
         User user = getUserByTelegramId(telegramId);
-        return dailyActivityRepository
-                .findDayActivities(user.getId(), dayOfWeek)
-                .stream()
-                .map(DailyActivityItem::from)
-                .toList();
+        int dayOfWeek = date.getDayOfWeek().getValue();
+
+        List<DailyActivity> activities = dailyActivityRepository
+                .findByUserIdAndDate(user.getId(), date);
+        if (activities.isEmpty()) {
+            activities = dailyActivityRepository
+                    .findByUserIdAndDayOfWeekAndDateIsNull(user.getId(), dayOfWeek);
+        }
+        return activities.stream().map(DailyActivityItem::from).toList();
     }
 
     /**
@@ -536,7 +894,7 @@ public class SheetsService {
      * Kiểm tra xem sheet có phải format lưới không.
      * Nhận biết bằng cột đầu tiên của header chứa " - " (dạng "HH:MM - HH:MM").
      */
-    private boolean isGridFormat(List<List<Object>> allRows) {
+    private boolean isGridFormatRows(List<List<Object>> allRows) {
         if (allRows == null || allRows.isEmpty()) return false;
         List<Object> header = allRows.get(0);
         if (header.isEmpty()) return false;
@@ -733,7 +1091,7 @@ public class SheetsService {
                     .execute();
 
             List<List<Object>> headerRows = probe.getValues();
-            boolean isGrid = isGridFormat(headerRows);
+            boolean isGrid = isGridFormatRows(headerRows);
 
             log.info("User {} sheet format detected: {}", telegramId, isGrid ? "GRID" : "ROW");
 

@@ -3,6 +3,8 @@ package com.studybot.schedule;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 /**
  * Entity buổi học (tiết học cụ thể trong tuần).
  * Một môn học có thể có nhiều buổi: Thứ 2 tiết 1-3, Thứ 5 tiết 7-9, ...
@@ -44,4 +46,7 @@ public class ClassSession {
     @Builder.Default
     @Column(name = "week_type", length = 10)
     private String weekType = "ALL";
+
+    @Column(name = "date")
+    private LocalDate date;
 }

@@ -1,294 +1,233 @@
-# 📚 BÁO CÁO ĐỀ TÀI: BOT TELEGRAM QUẢN LÝ HỌC TẬP & CHI TIÊU
+# HUSTStudy Bot
 
----
+Telegram bot hỗ trợ quản lý học tập và chi tiêu cho sinh viên HUST.
 
-## 1. Đề bài
+## Tổng quan
 
-Trong quá trình học tập, học sinh và sinh viên thường gặp nhiều khó khăn như:
+Repo hiện tại gồm 2 thành phần chính:
 
-- Quên lịch học.
-- Quên deadline bài tập.
-- Không theo dõi được lịch thi.
-- Khó quản lý thời khóa biểu cá nhân.
-- Thiếu công cụ hỗ trợ ôn tập từ vựng.
-- **Chi tiêu không kiểm soát**, không biết tiền đi đâu cuối tháng.
-- Không có cái nhìn tổng quan về tài chính cá nhân.
+- `bot/`: Python Telegram Bot, nhận lệnh từ Telegram và gọi backend.
+- `backend/`: Spring Boot REST API, xử lý nghiệp vụ và làm việc với MySQL, Google Sheets.
 
-Để giải quyết các vấn đề trên, đề tài xây dựng một **bot Telegram quản lý học tập và chi tiêu** nhằm hỗ trợ người dùng tổ chức lịch học, theo dõi nhiệm vụ, ôn tập hiệu quả và kiểm soát tài chính cá nhân ngay trong ứng dụng Telegram.
+Hệ thống lưu dữ liệu trong MySQL, đồng bộ một số dữ liệu học tập sang Google Sheets, và có các tác vụ định kỳ bằng scheduler.
 
-Bot dự kiến cung cấp các nhóm chức năng chính:
+## Tính năng chính
 
-- Quản lý thời khóa biểu.
-- Nhắc lịch học, deadline bài tập và lịch thi.
-- Thông báo các sự kiện học tập trong ngày.
-- Xuất dữ liệu và báo cáo lên Google Sheets.
-- Hỏi đáp và ôn tập từ vựng tiếng Anh.
-- **Quản lý chi tiêu cá nhân**: ghi chép, phân loại và thống kê thu chi.
+### Học tập
 
-Hệ thống sử dụng kết hợp **Java**, **Python** và cơ sở dữ liệu **MySQL**. Java đảm nhiệm phần backend API, Python xử lý Telegram Bot và các tác vụ tự động, còn MySQL lưu trữ dữ liệu học tập của người dùng.
+- Quản lý thời khóa biểu và lịch sinh hoạt.
+- Đồng bộ lịch sinh hoạt từ Google Sheets.
+- Xem lịch hôm nay và cả tuần.
+- Quản lý deadline.
+- Quản lý lịch thi.
+- Theo dõi sự kiện HUST CTSV.
 
----
+### Từ vựng tiếng Anh
 
-## 2. Mục tiêu và kết quả mong muốn
+- Thêm từ vựng mới.
+- Ôn tập bằng lệnh quiz.
+- Xem danh sách từ đã lưu.
 
-### 2.1. Đối với người dùng
+### Chi tiêu
 
-Sau khi hoàn thành, người dùng có thể:
+- Ghi chi tiêu và thu nhập nhanh ngay trong Telegram.
+- Xem báo cáo chi tiêu theo tháng.
+- Quản lý danh mục chi tiêu.
+- Quét hóa đơn bằng ảnh với AI.
+- Cấu hình Groq API key riêng cho từng user.
+- Kiểm tra trạng thái/quota API key.
 
-- Quản lý lịch học trực tiếp trên Telegram.
-- Thêm, sửa, xóa và xem thời khóa biểu.
-- Nhận thông báo lịch học và deadline tự động.
-- Theo dõi lịch thi sắp tới.
-- Xuất thời khóa biểu và chi tiêu ra Google Sheets.
-- Ôn tập từ vựng tiếng Anh bằng chế độ hỏi đáp.
-- **Ghi chép thu chi nhanh** ngay trong chat Telegram.
-- Xem báo cáo chi tiêu theo ngày, tuần, tháng.
-- Đặt ngân sách và nhận cảnh báo khi vượt hạn mức.
+### Cài đặt
 
-### 2.2. Đối với hệ thống
+- Lưu Google Sheet cá nhân cho từng user.
+- Cấu hình thông báo.
+- Hỗ trợ thao tác qua nút menu và command.
 
-Hệ thống cần đạt các yêu cầu:
+## Kiến trúc
 
-- Hoạt động ổn định, có thể chạy liên tục.
-- Phản hồi nhanh với các lệnh Telegram.
-- Lưu trữ dữ liệu an toàn và có tổ chức.
-- Dễ mở rộng thêm tính năng mới.
-- Có thể triển khai trên Linux, VPS hoặc cloud server.
-
----
-
-## 3. Công nghệ sử dụng
-
-### 3.1. Java và Spring Boot
-
-Java được sử dụng để xây dựng backend API, xử lý nghiệp vụ, kết nối database và tích hợp Google Sheets.
-
-**Lý do sử dụng:**
-
-- Hiệu năng ổn định.
-- Phù hợp với hệ thống backend có nhiều nghiệp vụ.
-- Dễ mở rộng và bảo trì.
-- Hệ sinh thái Spring Boot hỗ trợ tốt cho API, bảo mật và database.
-
-### 3.2. Python
-
-Python được sử dụng để xử lý Telegram Bot, scheduler gửi thông báo, hệ thống hỏi đáp từ vựng và các tác vụ automation.
-
-**Thư viện dự kiến:**
-
-- `python-telegram-bot`
-- `APScheduler`
-
-**Lý do sử dụng:**
-
-- Phát triển bot nhanh.
-- Có nhiều thư viện hỗ trợ Telegram và xử lý lịch.
-- Dễ tích hợp thêm AI hoặc NLP trong tương lai.
-
-### 3.3. Telegram Bot API
-
-Telegram Bot API được dùng để:
-
-- Gửi và nhận tin nhắn.
-- Tạo các command cho người dùng.
-- Gửi thông báo tự động.
-- Xử lý callback button và menu tương tác.
-
-### 3.4. MySQL
-
-MySQL được dùng để lưu trữ:
-
-- Thông tin người dùng.
-- Thời khóa biểu.
-- Deadline bài tập.
-- Lịch thi.
-- Danh sách từ vựng tiếng Anh.
-- Lịch sử học tập và kết quả ôn tập.
-- **Giao dịch thu chi** (số tiền, danh mục, ghi chú, ngày giờ).
-- **Danh mục chi tiêu** (ăn uống, học phí, giải trí, ...).
-- **Ngân sách hàng tháng** theo từng danh mục.
-
-**Lý do sử dụng:**
-
-- Phổ biến và dễ triển khai.
-- Hiệu năng tốt với dữ liệu quan hệ.
-- Hỗ trợ tốt cho cả Java và Python.
-- Phù hợp với bài toán quản lý dữ liệu học tập.
-
-### 3.5. Google Sheets API
-
-Google Sheets API được dùng để:
-
-- Xuất thời khóa biểu ra Google Sheets.
-- Xuất danh sách bài tập và lịch thi.
-- Xuất báo cáo chi tiêu theo tháng.
-- Tự động cập nhật sheet khi có dữ liệu mới.
-- Cho phép người dùng xem và chia sẻ dữ liệu dưới dạng bảng tính.
-
-### 3.6. Scheduler
-
-Hệ thống sử dụng scheduler để gửi thông báo đúng thời điểm:
-
-- **Spring Scheduler** cho các tác vụ phía Java.
-- **APScheduler** cho các tác vụ phía Python.
-
-**Các tác vụ chính:**
-
-- Nhắc lịch học.
-- Nhắc deadline bài tập.
-- Nhắc lịch thi.
-- Gửi tổng hợp sự kiện học tập trong ngày.
-
-### 3.7. Môi trường triển khai
-
-Hệ thống có thể triển khai trên:
-
-- Ubuntu Server.
-- VPS hoặc cloud server.
-- AWS, Render, Railway hoặc các nền tảng tương tự.
-
----
-
-## 4. Tính năng hệ thống
-
-### 4.1. Quản lý thời khóa biểu hoạt động hằng ngày.
-
-+ thêm lịch học trên trường. thêm lịch làm việc cá nhân + từ google sheet.
-
-- Chỉnh sửa lịch học.
-- Xem lịch học theo ngày hoặc theo tuần.
-
-**các command:**
-
-```
-/connectsheet
-/sync
-
-/schedule
-/timetable
-
-/addsubject
-/editsubject
-/deletesubject
-
-/adddeadline
-/deadlines
-/deletedeadline
-
-/notification
-/remind
-
-/stats
-/help
+```text
+Telegram User
+    |
+    v
+Python Telegram Bot
+    |
+    v
+Spring Boot Backend API
+    |
+    +--> MySQL
+    +--> Google Sheets API
+    +--> Scheduler
 ```
 
-4.2 Quản lý lịch thi và deadline
+- Bot Python xử lý giao diện chat, command, callback button.
+- Backend Java xử lý dữ liệu, CRUD, sync sheet, báo cáo và lịch.
+- MySQL lưu toàn bộ dữ liệu chính.
+- Scheduler dùng cho các job định kỳ.
 
-- Import lịch thi từ file sheet của trường -> so khớp với thời khóa biểu -> tìm đúng lịch thi.
-- Thêm lịch thi thủ công
-- Đếm ngược đến ngày thi
-- Lịch thi tuần này
-- Quản lý deadline bài tập
-- Đánh dấu đã hoàn thành
-- Mức độ ưu tiên
+## Command
 
-### 4.3. Thông báo hằng ngày( sự kiện ĐRL, sự kiện sắp đến, quiz từ vựng ngẫu nhiên)
+### Khởi động và trợ giúp
 
-Mỗi ngày, bot có thể gửi bản tổng hợp gồm:
+- `/start`
+- `/help`
 
-- Đang giờ này đang là giờ gì
-- Deadline bài tập.
-- Lịch thi gần nhất.
-- Nhiệm vụ học tập cần hoàn thành.
+### Chi tiêu
 
-### 4.4. Chế độ hỏi đáp từ vựng , ngữ pháp
+- `/addexpense <số_tiền> [ghi chú]`
+- `/addincome <số_tiền> [ghi chú]`
+- `/report`
+- `/setkey <groq_key>`
+- `/setkey delete`
+- `/setkey clear`
+- `/keystatus`
 
-Người dùng có thể thêm từ vựng theo dạng:
+### Lịch học và lịch sinh hoạt
 
+- `/setsheet <link_google_sheet>`
+- `/daily`
+- `/dailyweek`
+- `/syncdaily`
+
+### Deadline
+
+- `/deadline`
+- `/adddeadline <tiêu_đề> <YYYY-MM-DD> [môn_học]`
+- `/donedl <id>`
+
+### Lịch thi
+
+- `/exam`
+- `/addexam <tên_môn> <YYYY-MM-DD> [HH:MM]`
+
+### Từ vựng
+
+- `/quiz`
+- `/addword <english> - <vietnamese>`
+- `/words`
+
+### Thông báo và sự kiện
+
+- `/notifysettings`
+- `/hustevents`
+
+## Menu trong bot
+
+Bot có menu nút bấm ở đáy màn hình cho các nhóm chức năng:
+
+- Lịch học
+- Chi tiêu
+- Sự kiện
+- Tiếng Anh
+- Cài đặt
+
+Các nút này gọi lại đúng các command/tác vụ tương ứng.
+
+## Yêu cầu hệ thống
+
+- Python 3.11+ cho bot.
+- Java 17+ cho backend.
+- MySQL 8+.
+- Docker và Docker Compose nếu muốn chạy theo container.
+- Một Telegram bot token từ BotFather.
+- Google Sheets API credentials nếu dùng đồng bộ sheet.
+- Groq API key nếu dùng scan hóa đơn bằng ảnh.
+
+## Cấu hình môi trường
+
+Tạo file `.env` từ `.env.example`:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=huststudy_bot
+DB_USER=studybot
+DB_PASSWORD=your_db_password_here
+DB_ROOT_PASSWORD=your_root_password_here
+
+SERVER_PORT=8081
+
+GOOGLE_CREDENTIALS_PATH=classpath:google-credentials.json
+GOOGLE_SPREADSHEET_ID=your_spreadsheet_id_here
+
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_BOT_USERNAME=your_bot_username_here
 ```
-apple - quả táo
-computer - máy tính
+
+Ở phía bot Python, các biến chính đang được đọc là:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_BOT_USERNAME`
+- `API_BASE_URL`
+- `GROQ_API_KEY`
+
+## Chạy bằng Docker
+
+1. Tạo file `.env`.
+2. Đảm bảo backend có cấu hình Google Sheets/Groq nếu cần.
+3. Chạy:
+
+```bash
+docker compose up --build
 ```
 
-Bot sẽ:
+Mặc định compose sẽ khởi chạy:
 
-- Hỏi nghĩa của từ.
-- Kiểm tra đáp án.
-- Thống kê số câu đúng và sai.
+- MySQL
+- Backend Spring Boot
+- Telegram bot Python
 
-**Ví dụ:**
+Nếu muốn mở thêm phpMyAdmin cho môi trường dev:
 
-```
-Bot: "computer" nghĩa là gì?
-User: máy tính
-Bot: Chính xác. ✅
+```bash
+docker compose --profile dev up --build
 ```
 
-Tính năng này có thể mở rộng thành:
+phpMyAdmin sẽ chạy tại `http://localhost:8888`.
 
-- Flashcard.
-- Random quiz.
-- Spaced repetition.
-- Chatbot hỗ trợ học tiếng Anh.
+## Chạy thủ công
 
-### 4.5. Quản lý chi tiêu cá nhân
+### Backend
 
-- đưa vào ảnh  lấy note chji tiêu
-
-
----
-
-## 5. Kiến trúc hệ thống
-
-```
-Người dùng Telegram
-        |
-        v
-Telegram Bot API
-        |
-        +---------------------+
-        |                     |
-        v                     v
-Python Bot Service     Java Backend API
-        |                     |
-        +----------+----------+
-                   |
-                   v
-             MySQL Database
-                   |
-                   v
-          Google Sheets API
+```bash
+cd backend
+mvn spring-boot:run
 ```
 
-**Mô tả luồng hoạt động:**
+### Bot
 
-1. Người dùng gửi lệnh hoặc tin nhắn cho bot trên Telegram.
-2. **Python Bot Service** tiếp nhận tin nhắn, xử lý các lệnh đơn giản và gọi backend khi cần.
-3. **Java Backend API** xử lý nghiệp vụ chính, làm việc với MySQL và Google Sheets.
-4. **Scheduler** kiểm tra lịch định kỳ và yêu cầu bot gửi thông báo cho người dùng.
+```bash
+cd bot
+pip install -r requirements.txt
+python main.py
+```
 
----
+## Dữ liệu và migration
 
-## 6. Hướng phát triển tương lai
+Backend dùng Flyway để quản lý schema database. Các file migration nằm trong:
 
-Các tính năng có thể phát triển thêm:
+`backend/src/main/resources/db/migration`
 
-**Học tập:**
+## Ghi chú triển khai
 
-- 🤖 AI hỗ trợ học tập.
-- 💬 Chatbot giải bài tập.
-- 📅 Gợi ý lịch học tối ưu.
-- 🖥️ Dashboard web quản lý học tập.
-- 🔗 Đồng bộ Google Classroom.
-- 📊 Phân tích tiến độ học tập.
-- ✅ Hệ thống điểm danh.
-- 🔄 Chế độ ôn tập theo spaced repetition.
+- Backend chạy với context path `/api`.
+- Bot mặc định gọi backend qua `API_BASE_URL`.
+- Scheduler được bật trong backend để chạy các job định kỳ.
 
-**Chi tiêu:**
+## Cấu trúc thư mục
 
-- 📈 Biểu đồ chi tiêu trực quan (xuất ảnh PNG).
-- 🏦 Theo dõi nhiều ví / tài khoản ngân hàng.
-- 🔁 Giao dịch định kỳ tự động (học phí, tiền nhà).
-- 📤 Xuất báo cáo ra file Excel / CSV.
-- 🎯 Mục tiêu tiết kiệm và theo dõi tiến độ.
-- 🤝 Chi tiêu nhóm và chia bill.
+```text
+.
+├── backend/        # Spring Boot API
+├── bot/            # Telegram bot bằng Python
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+## Tình trạng dự án
+
+Đây là README đã được cập nhật theo code hiện tại trong repo. Nếu bạn muốn, tôi có thể tiếp tục:
+
+1. Viết thêm mục “Hướng dẫn sử dụng” cho từng lệnh.
+2. Bổ sung sơ đồ database hoặc API endpoints.
+3. Rút gọn README theo kiểu ngắn gọn, dễ dùng cho GitHub.

@@ -28,10 +28,11 @@ public class ScheduleItem {
     private final String endTime;         // HH:mm
     private final String room;
     private final String teacher;
+    private final String date;            // yyyy-MM-dd (null if recurring)
 
     private ScheduleItem(Long sessionId, String subjectName, String subjectCode,
                          Integer dayOfWeek, String startTime, String endTime,
-                         String room, String teacher) {
+                         String room, String teacher, String date) {
         this.sessionId   = sessionId;
         this.subjectName = subjectName;
         this.subjectCode = subjectCode;
@@ -40,6 +41,7 @@ public class ScheduleItem {
         this.endTime     = endTime;
         this.room        = room;
         this.teacher     = teacher;
+        this.date        = date;
     }
 
     /** Factory từ ClassSession entity. */
@@ -52,7 +54,8 @@ public class ScheduleItem {
                 cs.getStartTime(),
                 cs.getEndTime(),
                 cs.getRoom(),
-                cs.getSubject().getTeacher()
+                cs.getSubject().getTeacher(),
+                cs.getDate() != null ? cs.getDate().toString() : null
         );
     }
 }
