@@ -233,8 +233,15 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
+        # Lấy danh sách danh mục của user để gửi kèm vào prompt cho AI
+        try:
+            user_categories = await api.get_categories(tid)
+            cat_names = [c.get("name") for c in user_categories if c.get("name")]
+        except Exception:
+            cat_names = []
+
         # Gọi Groq Vision (dùng key của user nếu có, fallback về owner key)
-        result = await scan_bill_image(bytes(img_data), api_key=user_key)
+        result = await scan_bill_image(bytes(img_data), categories=cat_names, api_key=user_key)
 
         if not result.get("success"):
             err = result.get("error", "Không nhận diện được.")

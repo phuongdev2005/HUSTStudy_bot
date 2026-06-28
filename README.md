@@ -66,10 +66,12 @@ Spring Boot Backend API
 ## Các lệnh trên Bot (Commands)
 
 ### Khởi động và trợ giúp
+
 - `/start` - Khởi động bot, đăng ký tài khoản (nếu chưa có) và hiển thị menu chính.
 - `/help` - Xem hướng dẫn sử dụng chi tiết.
 
 ### Quản lý chi tiêu
+
 - `/addexpense <số_tiền> [ghi chú]` - Ghi nhanh chi tiêu tay (VD: `/addexpense 35k cơm trưa`).
 - `/addincome <số_tiền> [ghi chú]` - Ghi nhanh thu nhập tay.
 - `/report` - Xem báo cáo chi tiêu tháng này.
@@ -78,26 +80,31 @@ Spring Boot Backend API
 - `/keystatus` - Xem số lượt scan hóa đơn miễn phí còn lại trong ngày.
 
 ### Lịch học & Google Sheet
+
 - `/setsheet <link_google_sheet>` - Cài đặt link Google Sheet của bạn.
 - `/daily` - Xem lịch sinh hoạt hôm nay.
 - `/dailyweek` - Xem lịch sinh hoạt cả tuần.
 - `/syncdaily` - Đồng bộ lại lịch học và lịch sinh hoạt từ Google Sheet vào DB.
 
 ### Deadline
+
 - `/deadline` - Xem danh sách deadline hiện có.
 - `/adddeadline <tiêu_đề> <YYYY-MM-DD> [môn_học]` - Thêm deadline mới.
 - `/donedl <id>` - Đánh dấu hoàn thành deadline.
 
 ### Lịch thi
+
 - `/exam` - Xem danh sách lịch thi.
 - `/addexam <tên_môn> <YYYY-MM-DD> [HH:MM]` - Thêm lịch thi mới.
 
 ### Học từ vựng
+
 - `/quiz` - Bắt đầu làm Quiz ôn tập từ vựng.
 - `/addword <english> - <vietnamese>` - Thêm từ vựng mới kèm nghĩa.
 - `/words` - Xem danh sách tất cả từ vựng đang học.
 
 ### Thông báo & Sự kiện
+
 - `/notifysettings` - Mở menu cài đặt bật/tắt nhận thông báo.
 - `/hustevents` - Xem các sự kiện CTSV HUST sắp diễn ra.
 
@@ -151,34 +158,43 @@ docker compose up --build -d
 ```
 
 Lệnh trên sẽ tự động dựng và chạy 3 container:
+
 - `mysql`: Database MySQL 8.0
 - `backend`: Java Spring Boot Backend API
 - `bot`: Python Telegram Bot Client
 
 ### phpMyAdmin (Môi trường Dev)
+
 Nếu bạn muốn truy cập giao diện quản trị database (phpMyAdmin) khi đang lập trình:
 
 ```bash
 docker compose --profile dev up --build -d
 ```
+
 Giao diện phpMyAdmin sẽ khả dụng tại địa chỉ `http://localhost:8888`.
 
 ## Hướng dẫn chạy thủ công (Không dùng Docker)
 
 ### 1. Cài đặt Database
+
 - Tạo một database MySQL tên là `huststudy_bot`.
 - Tạo user và grant toàn quyền cho user đó trên database vừa tạo.
 
 ### 2. Chạy Backend (Spring Boot)
+
 Di chuyển vào thư mục backend và chạy ứng dụng:
+
 ```bash
 cd backend
 mvn spring-boot:run
 ```
+
 Flyway sẽ tự động chạy các tệp migration trong `backend/src/main/resources/db/migration` để tạo bảng dữ liệu.
 
 ### 3. Chạy Telegram Bot (Python)
+
 Di chuyển vào thư mục bot, cài đặt thư viện và chạy:
+
 ```bash
 cd bot
 pip install -r requirements.txt

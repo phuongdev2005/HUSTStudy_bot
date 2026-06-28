@@ -16,24 +16,28 @@ logger = logging.getLogger(__name__)
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-SCAN_PROMPT = (
-    "Phân tích hóa đơn/biên lai trong ảnh và trả về JSON:\n"
-    '{"amount": <tổng tiền thanh toán cuối cùng, số nguyên, không dấu phẩy>,\n'
-    '"description": "<Liệt kê tất cả sản phẩm/dịch vụ mua trong hóa đơn kèm số lượng và giá của chúng, ví dụ: 2 Cơm tấm (70k) + 1 Pepsi (15k). Hãy viết ngắn gọn, súc tích và ngăn cách bằng dấu cộng (+)>",\n'
-    '"category": "<một tên danh mục ngắn, nên trùng với cách user thường đặt, ví dụ: Ăn uống, Xăng xe, Học tập, Mua sắm, Di chuyển, Giải trí, Sức khỏe, Khác>",\n'
-    '"merchant": "<tên cửa hàng nếu đọc được, không thì null>",\n'
-    '"type": "EXPENSE",\n'
-    '"confidence": <0.0-1.0>}\n'
-    "Chỉ trả về JSON thuần, không markdown, không giải thích."
-)
+def get_scan_prompt(categories: list[str] | None = None) -> str:
+    """Tạo prompt scan ảnh chứa danh mục của user."""
+    cat_list = ", ".join(categories) if categories else "Ăn uống, Xăng xe, Học tập, Mua sắm, Di chuyển, Giải trí, Sức khỏe, Khác"
+    return (
+        "Phân tích hóa đơn/biên lai trong ảnh và trả về JSON:\n"
+        '{"amount": <tổng tiền thanh toán cuối cùng, số nguyên, không dấu phẩy>,\n'
+        '"description": "<Liệt kê tất cả sản phẩm/dịch vụ mua trong hóa đơn kèm số lượng và giá của chúng, ví dụ: 2 Cơm tấm (70k) + 1 Pepsi (15k). Hãy viết ngắn gọn, súc tích và ngăn cách bằng dấu cộng (+)>",\n'
+        f'"category": "<BẮT BUỘC phải phân loại hóa đơn vào MỘT trong những danh mục sau: [{cat_list}]. Hãy chọn danh mục phù hợp nhất>",\n'
+        '"merchant": "<tên cửa hàng nếu đọc được, không thì null>",\n'
+        '"type": "EXPENSE",\n'
+        '"confidence": <0.0-1.0>}\n'
+        "Chỉ trả về JSON thuần, không markdown, không giải thích."
+    )
 
 
-async def scan_bill_image(image_bytes: bytes, api_key: str | None = None) -> dict:
+async def scan_bill_image(image_bytes: bytes, categories: list[str] | None = None, api_key: str | None = None) -> dict:
     """
     Gửi ảnh lên Groq Vision và trả về dict kết quả.
 
     Args:
         image_bytes: Bytes của ảnh (JPEG/PNG)
+        categories: Danh sách danh mục thực tế của user để AI phân loại đúng
         api_key: Groq API key (dùng key riêng của user nếu có, fallback về owner key)
 
     Returns:
@@ -53,7 +57,7 @@ async def scan_bill_image(image_bytes: bytes, api_key: str | None = None) -> dic
             "role": "user",
             "content": [
                 {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
-                {"type": "text", "text": SCAN_PROMPT},
+                {"type": "text", "text": get_scan_prompt(categories)},
             ],
         }],
         "max_tokens": 300,
