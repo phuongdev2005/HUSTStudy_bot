@@ -63,6 +63,9 @@ def expense_menu() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⚙️ Quản lý danh mục",  callback_data="expense_manage_cat"),
             InlineKeyboardButton("📥 Xuất file Excel",   callback_data="expense_export_excel"),
         ],
+        [
+            InlineKeyboardButton("🗑️ Reset dữ liệu chi tiêu", callback_data="settings_reset_expense_confirm"),
+        ],
     ])
 
 
@@ -108,6 +111,9 @@ def settings_menu() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🤖 Cài Groq API Key",   callback_data="settings_setkey"),
             InlineKeyboardButton("📊 Xem quota AI",       callback_data="settings_keystatus"),
+        ],
+        [
+            InlineKeyboardButton("🗑️ Reset dữ liệu chi tiêu", callback_data="settings_reset_expense_confirm"),
         ],
     ])
 

@@ -1,0 +1,27 @@
+@startuml Google_Sheets_Sync_Flow
+!theme plain
+skinparam roundcorner 5
+
+actor "Người dùng" as user
+participant "Telegram Bot" as bot
+participant "Backend API" as api
+boundary "Google Sheets API" as sheets
+database "MySQL" as db
+
+user -> bot : Gửi /setsheet <URL> hoặc click Đồng bộ
+activate bot
+bot -> api : Yêu cầu đồng bộ lịch học\n(telegramId, sheetUrl)
+activate api
+api -> sheets : Đọc dữ liệu từ bảng tính (Spreadsheet ID)
+activate sheets
+sheets --> api : Trả về danh sách dòng/cột
+deactivate sheets
+
+api -> api : Phân tích và chuẩn hóa dữ liệu lịch
+api -> db : Cập nhật/Lưu các bảng:\n- Subject\n- ClassSession\n- DailyActivity
+api --> bot : Trả về số lượng bản ghi đã đồng bộ
+deactivate api
+bot --> user : Thông báo kết quả đồng bộ thành công
+deactivate bot
+
+@enduml

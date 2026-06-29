@@ -202,6 +202,18 @@ public class ExpenseController {
         return ResponseEntity.ok(Map.of("message", "✅ Đã xóa giao dịch #" + id));
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  7b. Reset toàn bộ giao dịch chi tiêu của user
+    //
+    //  DELETE /api/expense/reset?telegramId=xxx
+    // ─────────────────────────────────────────────────────────────
+    @DeleteMapping("/reset")
+    public ResponseEntity<Map<String, String>> resetExpenses(
+            @RequestParam Long telegramId) {
+        expenseService.resetExpenses(telegramId);
+        return ResponseEntity.ok(Map.of("message", "✅ Đã reset toàn bộ dữ liệu giao dịch chi tiêu"));
+    }
+
     // ────────────────────────────────────────────────────────────
     // 10. Cài Groq API Key riêng
     //

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -92,6 +93,23 @@ public class ScheduleSyncController {
     @GetMapping("/{telegramId}/daily/all")
     public ResponseEntity<List<DailyActivityItem>> getAllDaily(@PathVariable Long telegramId) {
         return ResponseEntity.ok(sheetsService.getAllDailyActivities(telegramId));
+    }
+
+    /**
+     * Lấy lịch sinh hoạt theo ngày trong tuần hiện tại.
+     *
+     * GET /api/schedule/{telegramId}/daily?day=1
+     */
+    @GetMapping("/{telegramId}/daily")
+    public ResponseEntity<List<DailyActivityItem>> getDaily(
+            @PathVariable Long telegramId,
+            @RequestParam(required = false) Integer day) {
+
+        LocalDate date = LocalDate.now();
+        if (day != null && day >= 1 && day <= 7) {
+            date = date.plusDays(day - date.getDayOfWeek().getValue());
+        }
+        return ResponseEntity.ok(sheetsService.getDailyActivities(telegramId, date));
     }
 
     /**

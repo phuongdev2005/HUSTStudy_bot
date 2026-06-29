@@ -1,0 +1,30 @@
+@startuml Manual_Expense_Flow
+!theme plain
+skinparam roundcorner 5
+
+actor "Người dùng" as user
+participant "Telegram Bot" as bot
+participant "Backend API" as api
+database "MySQL" as db
+
+user -> bot : Nhập số tiền / chọn danh mục
+activate bot
+bot -> api : POST /api/expense/add\n(telegramId, amount, categoryName, note)
+activate api
+api -> db : Kiểm tra User tồn tại
+api -> db : Tìm ExpenseCategory theo name
+activate db
+db --> api : Kết quả danh mục
+deactivate db
+
+alt Không tìm thấy danh mục phù hợp
+    api -> db : Lấy hoặc tự tạo category "Khác"
+end
+
+api -> db : Lưu bản ghi Expense\n(source = MANUAL)
+api --> bot : Trả về thông tin giao dịch đã lưu
+deactivate api
+bot --> user : Gửi tin nhắn xác nhận & tóm tắt giao dịch
+deactivate bot
+
+@enduml

@@ -1,0 +1,32 @@
+@startuml User_Registration_Flow
+!theme plain
+skinparam roundcorner 5
+
+actor "Người dùng" as user
+participant "Telegram Bot" as bot
+participant "Backend API" as api
+database "MySQL" as db
+
+user -> bot : Gửi /start
+activate bot
+bot -> api : POST /api/users/register\n(telegramId, username, fullName)
+activate api
+api -> db : Tìm User theo telegramId
+activate db
+db --> api : Kết quả truy vấn
+deactivate db
+
+alt Chưa tồn tại
+    api -> db : Thêm User mới
+    api -> db : Tạo UserSettings mặc định
+    api -> db : Tạo danh mục mặc định "Khác"
+else Đã tồn tại
+    api -> db : Cập nhật is_active = true
+end
+
+api --> bot : Trả về thông tin User & Settings
+deactivate api
+bot --> user : Hiển thị Menu chính & Lời chào
+deactivate bot
+
+@enduml

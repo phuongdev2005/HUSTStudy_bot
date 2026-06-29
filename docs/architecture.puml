@@ -1,0 +1,28 @@
+@startuml HUSTStudy_bot_Architecture
+!theme plain
+skinparam roundcorner 5
+
+actor "Người dùng Telegram" as user
+
+package "Client Layer" {
+    component "Python Telegram Bot\n(python-telegram-bot)" as bot
+}
+
+package "External APIs" {
+    cloud "Groq Vision API" as groq
+    cloud "Google Sheets API" as sheets
+}
+
+package "Server Layer" {
+    component "Spring Boot Backend" as backend
+    database "MySQL Database" as mysql
+}
+
+user --> bot : 1. Tương tác (chat, callback, gửi ảnh)
+bot --> backend : 2. Gọi REST API
+backend --> mysql : 3. Truy vấn & lưu trữ (JPA)
+backend --> sheets : 4. Lấy dữ liệu thời khóa biểu
+bot --> groq : 5. Gửi ảnh hóa đơn phân tích
+backend ..> user : 6. Nhắc nhở định kỳ (ngầm)
+
+@enduml

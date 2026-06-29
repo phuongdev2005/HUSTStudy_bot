@@ -386,6 +386,47 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.edit_message_text(f"❌ Lỗi mở cài đặt thông báo: {e}")
 
+    elif data == "settings_reset_expense_confirm":
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🗑️ Có, xóa hết", callback_data="settings_reset_expense_execute"),
+                InlineKeyboardButton("❌ Hủy", callback_data="settings_reset_expense_cancel"),
+            ]
+        ])
+        await query.edit_message_text(
+            "⚠️ *XÁC NHẬN RESET CHI TIÊU*\n\n"
+            "Bạn có chắc chắn muốn xóa *TOÀN BỘ* lịch sử giao dịch (thu nhập & chi tiêu) không?\n"
+            "Hành động này *không thể hoàn tác*!",
+            parse_mode="Markdown",
+            reply_markup=kb,
+        )
+
+    elif data == "settings_reset_expense_execute":
+        try:
+            res = await api.reset_expenses(tid)
+            msg = res.get("message") or "✅ Đã reset toàn bộ dữ liệu giao dịch chi tiêu."
+            await query.edit_message_text(msg)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Lỗi khi reset dữ liệu: {e}")
+
+    elif data == "settings_reset_expense_cancel":
+        try:
+            status = await api.get_key_status(tid)
+            key_info = (
+                "✅ Đang dùng Groq Key riêng"
+                if status.get("hasOwnKey")
+                else f"🤖 Quota AI: {status.get('usedToday',0)}/{status.get('freeLimit',10)} lượt hôm nay"
+            )
+        except Exception:
+            key_info = "🤖 Quota AI: chưa xác định"
+
+        await query.edit_message_text(
+            f"⚙️ *Cài đặt*\n\n{key_info}\n\nChọn chức năng:",
+            parse_mode="Markdown",
+            reply_markup=settings_menu(),
+        )
+
 
 # ══════════════════════════════════════════════════════════════
 #  Private helpers
@@ -722,14 +763,18 @@ async def _cb_report(query, tid: int):
         te = report.get("totalExpense", 0)
         ti = report.get("totalIncome",  0)
         bl = ti - te
-        by_cat = report.get("byCategory", {})
+        categories = report.get("categories", [])
 
         cat_lines = ""
-        if by_cat:
-            for cat, amt in sorted(by_cat.items(), key=lambda x: x[1], reverse=True)[:5]:
+        if categories:
+            for cat_stat in categories[:5]:
+                cat_name = cat_stat.get("categoryName") or "Khác"
+                cat_icon = cat_stat.get("categoryIcon") or ""
+                amt = cat_stat.get("amount", 0)
                 pct = int(amt / te * 10) if te > 0 else 0
                 bar = "█" * pct + "░" * (10-pct)
-                cat_lines += f"\n  {cat}: {fmt_vnd(amt)}\n  `{bar}`\n"
+                label = f"{cat_icon} {cat_name}".strip()
+                cat_lines += f"\n  {label}: {fmt_vnd(amt)}\n  `{bar}`\n"
 
         recent = ""
         for tx in history[:5]:
@@ -1126,7 +1171,7 @@ async def new_category_input_handler(update: Update, context: ContextTypes.DEFAU
 
     # Tách icon (emoji) ra nếu có ở đầu
     parts = text.split(None, 1)
-    if len(parts) == 2 and len(parts[0]) <= 4:
+    if len(parts) == 2 and len(parts[0]) <= 4 and not any(c.isalpha() for c in parts[0]):
         icon, name = parts[0], parts[1]
     else:
         icon, name = "📂", text

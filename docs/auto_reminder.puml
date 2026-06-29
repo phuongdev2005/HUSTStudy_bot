@@ -1,0 +1,31 @@
+@startuml Automatic_Reminder_Flow
+!theme plain
+skinparam roundcorner 5
+
+participant "Scheduler Job" as sched
+database "MySQL" as db
+participant "Telegram Bot" as bot
+actor "Người dùng" as user
+
+sched -> db : Quét người dùng có bật thông báo\n(notify_class_remind, notify_deadline,...)
+activate db
+db --> sched : Danh sách User & UserSettings
+deactivate db
+
+loop Với mỗi User hợp lệ
+    sched -> db : Tìm sự kiện sắp diễn ra trong khoảng thời gian cấu hình\n(Tiết học, Deadline, Lịch thi)
+    activate db
+    db --> sched : Danh sách sự kiện sắp đến
+    deactivate db
+    
+    alt Có sự kiện cần nhắc
+        sched -> bot : Yêu cầu gửi tin nhắn nhắc nhở (telegramId, message)
+        activate bot
+        bot -> user : Gửi tin nhắn thông báo/cảnh báo
+        bot --> sched : Xác nhận gửi thành công
+        deactivate bot
+        sched -> db : Lưu log thông báo đã gửi (tránh gửi trùng)
+    end
+end
+
+@enduml

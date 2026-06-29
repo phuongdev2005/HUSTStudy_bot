@@ -773,12 +773,11 @@ public class SheetsService {
         User user = getUserByTelegramId(telegramId);
         int dayOfWeek = date.getDayOfWeek().getValue();
 
-        List<DailyActivity> activities = dailyActivityRepository
-                .findByUserIdAndDate(user.getId(), date);
-        if (activities.isEmpty()) {
-            activities = dailyActivityRepository
-                    .findByUserIdAndDayOfWeekAndDateIsNull(user.getId(), dayOfWeek);
-        }
+        List<DailyActivity> activities = new ArrayList<>(
+                dailyActivityRepository.findByUserIdAndDayOfWeekAndDateIsNull(user.getId(), dayOfWeek)
+        );
+        activities.addAll(dailyActivityRepository.findByUserIdAndDate(user.getId(), date));
+
         return activities.stream().map(DailyActivityItem::from).toList();
     }
 

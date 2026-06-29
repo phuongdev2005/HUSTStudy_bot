@@ -13,6 +13,7 @@
 # ============================================================
 
 import logging
+import unicodedata
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -42,6 +43,154 @@ def _parse_amount(text: str) -> int | None:
         return int(text)
     except ValueError:
         return None
+
+
+def _text_key(text: str | None) -> str:
+    """Normalize Vietnamese text for lightweight keyword matching."""
+    text = (text or "").strip().lower()
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return text.replace("đ", "d")
+
+
+def _pick_scan_category(name: str, ai_category: str, user_categories: list[str] | None) -> str:
+    """Use user's existing categories, with deterministic fallback for food/drink bills."""
+    categories = [c for c in (user_categories or []) if c]
+    if not categories:
+        return ai_category or "Khác"
+
+    by_key = {_text_key(c): c for c in categories}
+    ai_key = _text_key(ai_category)
+    
+    # 1. Khớp chính xác trước (bỏ qua "Khác" để ưu tiên check keyword cụ thể hơn)
+    if ai_key in by_key and ai_key != _text_key("Khác"):
+        return by_key[ai_key]
+
+    # 2. Khớp tương đối (ví dụ user có "áo" mà AI trả về "áo sơ mi" hoặc ngược lại)
+    for cat in categories:
+        cat_key = _text_key(cat)
+        if cat_key == _text_key("Khác"):
+            continue
+        if cat_key and ai_key and (cat_key in ai_key or ai_key in cat_key):
+            return cat
+
+    # 3. Fallback theo từ khóa món ăn/đồ uống dựa trên ranh giới từ (word boundary)
+    name_key = _text_key(name)
+    name_words = set(name_key.split())
+    
+    single_food_kws = {
+        "com", "bun", "pho", "mi", "my", "xao", "chien", "hap", "nuong",
+        "goi", "rau", "canh", "soup", "tom", "ca", "muc", "hao", "heo",
+        "bo", "ga", "cha", "banh", "sua", "tra", "nuoc", "bia", "cafe",
+        "chanh", "tomyum", "mam", "an", "uong"
+    }
+    multi_food_kws = ("hu tieu", "ca phe", "hai san")
+    
+    has_food_keyword = any(w in single_food_kws for w in name_words)
+    if not has_food_keyword:
+        for kw in multi_food_kws:
+            if kw in name_key:
+                idx = name_key.find(kw)
+                while idx != -1:
+                    start_ok = (idx == 0 or name_key[idx - 1].isspace() or name_key[idx - 1] in "-_,|")
+                    end_idx = idx + len(kw)
+                    end_ok = (end_idx == len(name_key) or name_key[end_idx].isspace() or name_key[end_idx] in "-_,|")
+                    if start_ok and end_ok:
+                        has_food_keyword = True
+                        break
+                    idx = name_key.find(kw, idx + 1)
+            if has_food_keyword:
+                break
+                
+    if has_food_keyword:
+        food_category = next(
+            (c for c in categories if "an" in _text_key(c) or "uong" in _text_key(c) or "food" in _text_key(c)),
+            None,
+        )
+        if food_category:
+            return food_category
+
+    # 3b. Fallback theo từ khóa quần áo/thời trang dựa trên ranh giới từ
+    clothing_category = next(
+        (c for c in categories if "ao" in _text_key(c) or "quan" in _text_key(c) or "mac" in _text_key(c) or "thoi trang" in _text_key(c) or "clothing" in _text_key(c) or "fashion" in _text_key(c)),
+        None,
+    )
+    if clothing_category:
+        single_clothing_kws = {
+            "ao", "quan", "vay", "dam", "jeans", "blazer", "jacket", "t-shirt", "socks", "giay"
+        }
+        has_clothing_kw = any(w in single_clothing_kws for w in name_words) or "so mi" in name_key
+        if has_clothing_kw:
+            return clothing_category
+
+    # 4. Fallback cuối cùng
+    if ai_key in by_key:
+        return by_key[ai_key]
+    return "Khác" if "Khác" in categories else categories[0]
+
+
+def _normalize_scan_items(result: dict, user_categories: list[str] | None = None) -> list[dict]:
+    """Convert AI scan result to itemized expense rows."""
+    raw_items = result.get("items")
+    items: list[dict] = []
+
+    if isinstance(raw_items, list):
+        for raw in raw_items:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                amount = int(float(raw.get("amount") or 0))
+            except (TypeError, ValueError):
+                amount = 0
+            if amount <= 0:
+                continue
+
+            name = str(raw.get("name") or raw.get("description") or "Không rõ").strip()
+            ai_category = str(raw.get("category") or result.get("category") or "Khác").strip() or "Khác"
+            category = _pick_scan_category(name, ai_category, user_categories)
+            quantity = raw.get("quantity")
+            unit_price = raw.get("unitPrice")
+            note_parts = [name]
+            if quantity not in (None, ""):
+                note_parts.append(f"SL: {quantity}")
+            if unit_price not in (None, ""):
+                try:
+                    note_parts.append(f"Đơn giá: {fmt_vnd(float(unit_price))}")
+                except (TypeError, ValueError):
+                    note_parts.append(f"Đơn giá: {unit_price}")
+            if raw.get("note"):
+                note_parts.append(str(raw.get("note")))
+
+            items.append({
+                "name": name,
+                "amount": amount,
+                "category": category,
+                "note": " | ".join(note_parts),
+                "quantity": quantity,
+                "unitPrice": unit_price,
+            })
+
+    if items:
+        return items
+
+    try:
+        amount = int(float(result.get("amount") or 0))
+    except (TypeError, ValueError):
+        amount = 0
+    if amount <= 0:
+        return []
+    return [{
+        "name": str(result.get("description") or "Hóa đơn").strip(),
+        "amount": amount,
+        "category": _pick_scan_category(
+            str(result.get("description") or "Hóa đơn").strip(),
+            str(result.get("category") or "Khác").strip() or "Khác",
+            user_categories,
+        ),
+        "note": str(result.get("description") or "Hóa đơn").strip(),
+        "quantity": None,
+        "unitPrice": None,
+    }]
 
 
 async def _require_registered(update: Update) -> bool:
@@ -151,16 +300,19 @@ async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_expense = report.get("totalExpense", 0)
         total_income  = report.get("totalIncome", 0)
         balance       = total_income - total_expense
-        by_category   = report.get("byCategory", {})
+        categories = report.get("categories", [])
 
         # Build category breakdown
         cat_lines = ""
-        if by_category:
-            sorted_cats = sorted(by_category.items(), key=lambda x: x[1], reverse=True)
-            for cat, amt in sorted_cats[:6]:
+        if categories:
+            for cat_stat in categories[:6]:
+                cat_name = cat_stat.get("categoryName") or "Khác"
+                cat_icon = cat_stat.get("categoryIcon") or ""
+                amt = cat_stat.get("amount", 0)
                 bar_pct = int(amt / total_expense * 10) if total_expense > 0 else 0
                 bar = "█" * bar_pct + "░" * (10 - bar_pct)
-                cat_lines += f"\n  {cat}: {fmt_vnd(amt)}\n  `{bar}`\n"
+                label = f"{cat_icon} {cat_name}".strip()
+                cat_lines += f"\n  {label}: {fmt_vnd(amt)}\n  `{bar}`\n"
 
         # Recent transactions
         recent = ""
@@ -254,6 +406,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         merchant    = result.get("merchant") or "Không rõ"
         confidence  = result.get("confidence", 0)
         conf_pct    = int(confidence * 100)
+        items       = _normalize_scan_items(result, cat_names)
 
         # Lưu vào context để dùng khi confirm
         context.user_data["pending_scan"] = {
@@ -263,28 +416,36 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "merchant":     merchant,
             "confidence":   confidence,
             "image_file_id": file_id,
+            "items":         items,
         }
 
         # Hiện preview với nút confirm/cancel
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("✅ Xác nhận lưu", callback_data="scan_confirm"),
-                InlineKeyboardButton("✏️ Sửa số tiền",  callback_data="scan_edit"),
+                InlineKeyboardButton("✅ Lưu từng món", callback_data="scan_confirm"),
             ],
             [InlineKeyboardButton("❌ Hủy",            callback_data="scan_cancel")],
         ])
 
         conf_bar = "🟩" * (conf_pct // 10) + "⬜" * (10 - conf_pct // 10)
+        item_lines = []
+        for idx, item in enumerate(items[:15], start=1):
+            item_lines.append(
+                f"{idx}. *{fmt_vnd(item['amount'])}* – {item['name']} → _{item['category']}_"
+            )
+        if len(items) > 15:
+            item_lines.append(f"... còn {len(items) - 15} dòng khác")
+        item_text = "\n".join(item_lines) if item_lines else "Không tách được từng món, sẽ lưu theo tổng hóa đơn."
 
         await msg.edit_text(
             f"🧾 *Kết quả nhận diện hóa đơn*\n"
             f"{'─' * 30}\n"
-            f"💰 Số tiền:   *{fmt_vnd(amount)}*\n"
-            f"📂 Danh mục: {category}\n"
+            f"💰 Tổng hóa đơn: *{fmt_vnd(amount)}*\n"
             f"🏪 Cửa hàng: {merchant}\n"
-            f"📝 Mô tả:     {description}\n\n"
+            f"📌 Số dòng sẽ lưu: *{len(items)}*\n\n"
+            f"{item_text}\n\n"
             f"🤖 Độ tin cậy: {conf_bar} {conf_pct}%\n\n"
-            f"_Kiểm tra lại thông tin và xác nhận lưu_",
+            f"_Kiểm tra lại thông tin và xác nhận lưu từng món_",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
@@ -329,22 +490,39 @@ async def scan_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
     if data == "scan_confirm":
         try:
-            result = await api.confirm_scan(
-                telegram_id   = tid,
-                amount        = pending["amount"],
-                category_name = pending["category"],
-                note          = pending["description"],
-                image_file_id = pending["image_file_id"],
-                ai_confidence = pending["confidence"],
-            )
-            # Dung ten danh muc thuc su da luu (backend co the fallback ve Khac)
-            saved_category = result.get("categoryName") or pending["category"]
+            items = pending.get("items") or []
+            saved = []
+            for item in items:
+                result = await api.confirm_scan(
+                    telegram_id   = tid,
+                    amount        = item["amount"],
+                    category_name = item["category"],
+                    note          = item["note"],
+                    image_file_id = pending["image_file_id"],
+                    ai_confidence = pending["confidence"],
+                )
+                saved.append({
+                    "amount": result.get("amount", item["amount"]),
+                    "category": result.get("categoryName") or item["category"],
+                    "name": item["name"],
+                })
+
             context.user_data.pop("pending_scan", None)
+            total_saved = sum(float(x["amount"] or 0) for x in saved)
+            lines = [
+                "✅ *Đã lưu từng món!*",
+                "",
+                f"📌 Số giao dịch: *{len(saved)}*",
+                f"💰 Tổng đã lưu: *{fmt_vnd(total_saved)}*",
+                "",
+            ]
+            for idx, item in enumerate(saved[:12], start=1):
+                lines.append(f"{idx}. {fmt_vnd(item['amount'])} – {item['name']} → _{item['category']}_")
+            if len(saved) > 12:
+                lines.append(f"... còn {len(saved) - 12} giao dịch khác")
+            lines.append("\n_Dùng /report để xem tổng tháng_")
             await query.edit_message_text(
-                f"✅ *Đã lưu chi tiêu!*\n\n"
-                f"💰 {fmt_vnd(pending['amount'])} – {pending['description']}\n"
-                f"📂 {saved_category}\n\n"
-                f"_Dùng /report để xem tổng tháng_",
+                "\n".join(lines),
                 parse_mode="Markdown"
             )
         except Exception as e:

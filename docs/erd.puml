@@ -1,0 +1,138 @@
+@startuml HUSTStudy_bot_ERD
+!theme plain
+skinparam roundcorner 5
+skinparam class {
+    BackgroundColor White
+    BorderColor #333333
+    ArrowColor #666666
+}
+
+hide circle
+hide empty methods
+
+entity "User" as user {
+    * id : BIGINT <<PK>>
+    --
+    * telegram_id : BIGINT
+    username : VARCHAR
+    * full_name : VARCHAR
+    language_code : VARCHAR
+    timezone : VARCHAR
+    * is_active : BOOLEAN
+}
+
+entity "UserSettings" as settings {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    notify_class_remind : BOOLEAN
+    notify_deadline : BOOLEAN
+    notify_exam : BOOLEAN
+    notify_daily_summary : BOOLEAN
+    notify_hust_events : BOOLEAN
+    daily_summary_time : TIME
+    google_sheet_url : VARCHAR
+    groq_api_key : VARCHAR
+}
+
+entity "Word" as word {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * word : VARCHAR
+    * meaning : VARCHAR
+    example : TEXT
+    pronunciation : VARCHAR
+    level : INTEGER
+    next_review_at : DATETIME
+}
+
+entity "Subject" as subject {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * name : VARCHAR
+    code : VARCHAR
+    teacher : VARCHAR
+    credits : INTEGER
+    * is_active : BOOLEAN
+}
+
+entity "ClassSession" as session {
+    * id : BIGINT <<PK>>
+    --
+    * subject_id : BIGINT <<FK>>
+    * day_of_week : INTEGER
+    * start_time : VARCHAR
+    * end_time : VARCHAR
+    room : VARCHAR
+    week_type : VARCHAR
+}
+
+entity "DailyActivity" as activity {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    day_of_week : INTEGER
+    * start_time : VARCHAR
+    * end_time : VARCHAR
+    * activity : VARCHAR
+    * category : VARCHAR
+}
+
+entity "ExpenseCategory" as exp_cat {
+    * id : INTEGER <<PK>>
+    --
+    user_id : BIGINT <<FK>>
+    * name : VARCHAR
+    icon : VARCHAR
+    type : VARCHAR
+    * is_default : BOOLEAN
+}
+
+entity "Expense" as expense {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * category_id : INTEGER <<FK>>
+    * type : VARCHAR
+    * amount : DECIMAL
+    note : VARCHAR
+    * transaction_at : DATETIME
+    image_file_id : VARCHAR
+    * source : VARCHAR
+}
+
+entity "Exam" as exam {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * subject_name : VARCHAR
+    * exam_date : DATE
+    * start_time : TIME
+    duration_min : INTEGER
+    room : VARCHAR
+}
+
+entity "Deadline" as deadline {
+    * id : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * title : VARCHAR
+    subject : VARCHAR
+    * due_date : DATE
+    * is_done : BOOLEAN
+}
+
+user ||--|| settings : "Cấu hình riêng (1-1)"
+user ||--o{ word : "Ôn từ vựng (1-N)"
+user ||--o{ subject : "Đăng ký môn (1-N)"
+subject ||--o{ session : "Có lịch học (1-N)"
+user ||--o{ activity : "Thời gian biểu (1-N)"
+user ||--o{ exp_cat : "Sở hữu/Tự tạo (0,1-N)"
+user ||--o{ expense : "Giao dịch thu chi (1-N)"
+exp_cat ||--o{ expense : "Phân loại theo (1-N)"
+user ||--o{ exam : "Lịch thi (1-N)"
+user ||--o{ deadline : "Bài tập/Nhiệm vụ (1-N)"
+
+@enduml

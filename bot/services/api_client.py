@@ -204,6 +204,18 @@ class ApiClient:
         response.raise_for_status()
         return response.json()
 
+    async def get_daily_schedule(self, telegram_id: int, day_of_week: int) -> list[dict]:
+        """
+        Lấy lịch sinh hoạt theo ngày trong tuần.
+        GET /api/schedule/{telegramId}/daily?day={day}
+        """
+        response = await self.client.get(
+            f"/schedule/{telegram_id}/daily",
+            params={"day": day_of_week},
+        )
+        response.raise_for_status()
+        return response.json()
+
     # ── Expense / Chi tiêu API ────────────────────────────────
 
     async def add_expense(self, telegram_id: int, type_: str, amount: int,
@@ -266,6 +278,12 @@ class ApiClient:
     async def get_key_status(self, telegram_id: int) -> dict:
         """Xem trạng thái quota AI của user."""
         r = await self.client.get("/expense/keystatus", params={"telegramId": telegram_id})
+        r.raise_for_status()
+        return r.json()
+
+    async def reset_expenses(self, telegram_id: int) -> dict:
+        """Reset toàn bộ giao dịch chi tiêu của user."""
+        r = await self.client.delete("/expense/reset", params={"telegramId": telegram_id})
         r.raise_for_status()
         return r.json()
 

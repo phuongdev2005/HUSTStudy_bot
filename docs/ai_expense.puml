@@ -1,0 +1,31 @@
+@startuml AI_Bill_Scanning_Flow
+!theme plain
+skinparam roundcorner 5
+
+actor "Người dùng" as user
+participant "Telegram Bot" as bot
+boundary "Groq Vision API" as groq
+participant "Backend API" as api
+database "MySQL" as db
+
+user -> bot : Gửi ảnh hóa đơn
+activate bot
+bot -> bot : Mã hóa ảnh sang Base64\nNhận diện định dạng (PNG/JPEG)
+bot -> groq : Gửi ảnh & danh sách danh mục của user\n(max_tokens=1200, temperature=0.1)
+activate groq
+groq --> bot : Phản hồi JSON (số tiền, items, danh mục đề xuất)
+deactivate groq
+bot --> user : Hiển thị kết quả trích xuất & nút "Xác nhận"
+deactivate bot
+
+user -> bot : Bấm nút "Xác nhận"
+activate bot
+bot -> api : POST /api/expense/confirm-scan\n(dữ liệu hóa đơn đã duyệt)
+activate api
+api -> db : Lưu bản ghi Expense & Items\n(source = AI_SCAN, ai_confidence)
+api --> bot : Trả về kết quả thành công
+deactivate api
+bot --> user : Thông báo đã ghi nhận chi tiêu từ hóa đơn
+deactivate bot
+
+@enduml

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service xử lý chi tiêu cá nhân.
@@ -278,6 +279,13 @@ public class ExpenseService {
             throw new IllegalArgumentException("Bạn không có quyền xóa giao dịch này.");
         }
         expenseRepository.delete(expense);
+    }
+
+    @Transactional
+    public void resetExpenses(Long telegramId) {
+        User user = getUser(telegramId);
+        expenseRepository.deleteAllByUser(user);
+        log.info("🧹 User {} đã reset toàn bộ giao dịch chi tiêu", telegramId);
     }
 
     @Transactional
