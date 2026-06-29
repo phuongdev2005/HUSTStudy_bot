@@ -16,7 +16,7 @@ RUN mvn package -DskipTests -q
 # ─────────────────────────────────────────────────────────────
 #  Stage 2 – Runtime image nhỏ gọn
 # ─────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
